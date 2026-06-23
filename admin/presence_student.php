@@ -212,14 +212,28 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <script src="../js/bootstrap.min.js"></script>
 
         <script>
-        $('.btn-detail').on('click', function() {
+        $('.btn-detail').click(function() {
 
             let id = $(this).data('id');
+
+            console.log(id);
 
             $('#detailContent').html('Chargement...');
 
             $('#detailContent').load(
-                'service/presence_detail.php?eleve_id=' + id
+                'presence_detail.php?eleve_id=' + id,
+                function(response, status, xhr) {
+
+                    console.log(status);
+                    console.log(response);
+
+                    if (status == "error") {
+                        $('#detailContent').html(
+                            '<div class="alert alert-danger">Erreur ' + xhr.status + '</div>'
+                        );
+                    }
+
+                }
             );
 
         });

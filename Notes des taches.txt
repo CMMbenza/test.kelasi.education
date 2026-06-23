@@ -127,3 +127,6 @@ executer dans data :
 
 1. Effectuer le paiement en présentiel
 2. Possibilité d'assigner un enseignant comme titulaire d'une classe
+
+#MAJ 23.06
+1.
