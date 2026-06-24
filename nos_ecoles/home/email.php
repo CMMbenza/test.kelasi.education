@@ -16,15 +16,33 @@ if (!function_exists('kelasi_login_url')) {
 }
 
 if (!function_exists('mail_html')) {
-    function mail_html(string $to, string $subject, string $html, string $from, string $fromName, ?string $replyTo=null): bool {
-        $headers = [];
-        $headers[] = 'MIME-Version: 1.0';
-        $headers[] = 'Content-type: text/html; charset=UTF-8';
-        $headers[] = 'From: '.sprintf('"%s" <%s>', '=?UTF-8?B?'.base64_encode($fromName).'?=', $from);
-        if ($replyTo) $headers[] = 'Reply-To: '.$replyTo;
-        $headers[] = 'X-Mailer: PHP/'.phpversion();
-        return @mail($to, '=?UTF-8?B?'.base64_encode($subject).'?=', $html, implode("\r\n",$headers));
+    function mail_html(
+    string $to,
+    string $subject,
+    string $html,
+    string $from,
+    string $fromName,
+    ?string $replyTo = null
+): bool {
+
+    $headers  = "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+    $headers .= "From: ".$fromName." <".$from.">\r\n";
+
+    if (!empty($replyTo)) {
+        $headers .= "Reply-To: ".$replyTo."\r\n";
     }
+
+    $headers .= "X-Mailer: PHP/".phpversion()."\r\n";
+
+    return mail(
+        $to,
+        '=?UTF-8?B?'.base64_encode($subject).'?=',
+        $html,
+        $headers,
+        "-f ".$from
+    );
+}
 }
 
 if (!function_exists('send_student_credentials')) {
@@ -68,45 +86,120 @@ if (!function_exists('notify_admins_new_student')) {
      * ]
      */
     function notify_admins_new_student(PDO $pdo, string $code_ecole, array $data): int {
-        $from      = $GLOBALS['MAIL_FROM'];
-        $fromName  = $GLOBALS['MAIL_FROM_NAME'];
-        $replyTo   = $GLOBALS['MAIL_REPLY_TO'];
-        $esc = fn($s)=>htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 
-        $subject = "Nouvelle inscription élève - ".$data['ecole_name'];
-        $html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#333">
-                    <p>Bonjour,</p>
-                    <p>Une <strong>nouvelle inscription</strong> a été soumise pour l’école <strong>'.$esc($data['ecole_name']).'</strong> (code école <strong>'.$esc($data['code_ecole']).'</strong>).</p>
-                    <ul>
-                      <li>Élève : <strong>'.$esc($data['first'].' '.$data['last']).'</strong></li>
-                      <li>Email élève : '.($data['email']!==''?$esc($data['email']):'<em>Non fourni</em>').'</li>
-                      <li>Téléphone élève : '.($data['phone']!==''?$esc($data['phone']):'<em>Non fourni</em>').'</li>
-                      <li>Responsable : '.$esc($data['father']).' / '.$esc($data['mother']).'</li>
-                      <li>Email resp. : '.$esc($data['email_resp']).'</li>
-                      <li>Téléphone resp. : '.$esc($data['phone_resp']).'</li>
-                      <li>Classe ID : '.($data['class_id']!==null?(int)$data['class_id']:'<em>Non renseigné</em>').'</li>
-                    </ul>
-                    <p>Identifiants générés pour l’élève :</p>
-                    <ul>
-                      <li>Username : <strong>'.$esc($data['username']).'</strong></li>
-                      <li>Password (temporaire) : <strong>'.$esc($data['password']).'</strong></li>
-                    </ul>
-                    <hr>
-                    <p style="font-size:12px;color:#666">Notification automatique MyKelasi.</p>
-                 </div>';
+    $from      = $GLOBALS['MAIL_FROM'];
+    $fromName  = $GLOBALS['MAIL_FROM_NAME'];
+    $replyTo   = $GLOBALS['MAIL_REPLY_TO'];
 
-        $sent = 0;
-        $stmt = $pdo->prepare("SELECT email FROM users
-                               WHERE code_ecole=:ec AND role IN ('admin','administrateur','promoteur')
-                                     AND email IS NOT NULL AND email<>''");
-        $stmt->execute([':ec'=>$code_ecole]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        foreach ($rows as $r) {
-            $to = $r['email'];
-            if ($to && filter_var($to, FILTER_VALIDATE_EMAIL)) {
-                if (mail_html($to, $subject, $html, $from, $fromName, $replyTo)) { $sent++; }
-            }
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
+    $subject = "Nouvelle inscription élève - ".$data['ecole_name'];
+
+    $html = '
+    <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#333">
+        <h2>Nouvelle inscription</h2>
+
+        <p>Une nouvelle inscription a été effectuée dans <b>'.$esc($data['ecole_name']).'</b>.</p>
+
+        <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse;width:100%;">
+            <tr>
+                <td><b>Élève</b></td>
+                <td>'.$esc($data['first'].' '.$data['last']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Email élève</b></td>
+                <td>'.$esc($data['email']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Téléphone</b></td>
+                <td>'.$esc($data['phone']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Responsable</b></td>
+                <td>'.$esc($data['father']).' '.$esc($data['mother']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Email responsable</b></td>
+                <td>'.$esc($data['email_resp']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Téléphone responsable</b></td>
+                <td>'.$esc($data['phone_resp']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Username</b></td>
+                <td>'.$esc($data['username']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Mot de passe</b></td>
+                <td>'.$esc($data['password']).'</td>
+            </tr>
+
+            <tr>
+                <td><b>Code école</b></td>
+                <td>'.$esc($data['code_ecole']).'</td>
+            </tr>
+        </table>
+
+        <br>
+
+        <p>
+            <a href="'.kelasi_login_url().'"
+            style="background:#0d6efd;color:#fff;padding:10px 18px;text-decoration:none;border-radius:5px;">
+                Accéder à MyKelasi
+            </a>
+        </p>
+
+    </div>';
+
+    $stmt = $pdo->prepare("
+        SELECT email
+        FROM users
+        WHERE code_ecole = :ec
+        AND role IN ('admin','administrateur','promoteur')
+        AND email IS NOT NULL
+        AND email <> ''
+    ");
+
+    $stmt->execute([
+        ':ec' => $code_ecole
+    ]);
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $sent = 0;
+
+    foreach ($rows as $row) {
+
+        $to = trim($row['email']);
+
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            continue;
         }
-        return $sent;
+
+        $ok = mail_html(
+            $to,
+            $subject,
+            $html,
+            $from,
+            $fromName,
+            $replyTo
+        );
+
+        error_log("Notification admin ".$to." => ".($ok ? "OK" : "ECHEC"));
+
+        if ($ok) {
+            $sent++;
+        }
     }
+
+    return $sent;
+}
 }
