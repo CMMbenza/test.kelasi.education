@@ -282,12 +282,9 @@ foreach ($teachers as $t) {
                 <div class="card-recherche mb-3">
                     <div class="card-body">
                         <form class="form-inline">
-                            <input type="text" name="q" value="<?= e($q) ?>" class="form-control mr-2"
+                            <input type="text" name="q" id="searchTable" class="form-control mr-2"
                                 placeholder="Rechercher (nom, email, téléphone)">
-                            <button class="btn btn-primary btn-lg">Rechercher</button>
-                            <?php if ($q!==''): ?>
-                            <a class="btn btn-light ml-2" href="all-teacher.php">Réinitialiser</a>
-                            <?php endif; ?>
+                            <a class="btn btn-danger ml-2" href="all-teacher.php">Réinitialiser</a>
                         </form>
                     </div>
                 </div>
@@ -385,6 +382,32 @@ foreach ($teachers as $t) {
     <script src="../js/fullcalendar.min.js"></script>
     <script src="../js/Chart.min.js"></script>
     <script src="../js/main.js"></script>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+
+        const input = document.getElementById("searchTable");
+
+        input.addEventListener("keyup", function() {
+
+            let valeur = this.value.toLowerCase();
+
+            document.querySelectorAll("table tbody tr").forEach(function(ligne) {
+
+                let texte = ligne.textContent.toLowerCase();
+
+                if (texte.indexOf(valeur) > -1) {
+                    ligne.style.display = "";
+                } else {
+                    ligne.style.display = "none";
+                }
+
+            });
+
+        });
+
+    });
+    </script>
 </body>
 
 </html>
