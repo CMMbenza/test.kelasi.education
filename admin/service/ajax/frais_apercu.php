@@ -64,10 +64,17 @@ try {
         LEFT JOIN niveau  n ON c.niveau  = n.id
         LEFT JOIN section s ON c.section = s.id
         LEFT JOIN options o ON c.options = o.id
-        WHERE c.code_ecole = :code
+        WHERE c.code_ecole = ?
     ";
     // Si des classes sont sélectionnées : on filtre
-    $params = [':code'=>$codeEcole];
+    $st = $pdo->prepare($sqlClasses);
+    $bind = [$codeEcole];
+
+    if (count($classeIds) > 0) {
+        $bind = array_merge($bind, $classeIds);
+    }
+
+$st->execute($bind);
     if (count($classeIds) > 0) {
         $in = implode(',', array_fill(0, count($classeIds), '?'));
         $sqlClasses .= " AND c.id IN ($in) ";
@@ -140,9 +147,7 @@ try {
             $lblNiv    = (string)($c['niveau_label'] ?? '');
             $lblSec    = (string)($c['section_label'] ?? '');
             $lblOpt    = (string)($c['option_label'] ?? '');
-            $key = ((int)$c['niveau_id']).'|'.((int)$c['section_id']).'|'.((int)$c['option_id']).'|'.((int)$c['id']); 
-            // ATTENTION : c.classe est un "code classe" stocké en INT dans ta table de config. Si c'est l'ID de la classe,
-            // remplace ci-dessus par: ...'|'.((int)$c['id']);
+            $key = ((int)$c['niveau_id']).'|'.((int)$c['section_id']).'|'.((int)$c['option_id']).'|'.((int)$c['id']);            // remplace ci-dessus par: ...'|'.((int)$c['id']);
 
             $montant = '—';
             $descr   = '';

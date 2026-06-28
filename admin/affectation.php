@@ -540,7 +540,7 @@ if ($prefTeacherValid) {
                                 <thead class="thead-light">
                                     <tr>
                                         <th>Classe</th>
-                                        <th>Titulaire</th>
+                                        <th>Status</th>
                                         <!-- <th>ID</th> -->
                                         <th>Action</th>
                                     </tr>
@@ -661,7 +661,7 @@ if ($prefTeacherValid) {
                                                             name="titulaire[<?= $cid ?>]" value="1"
                                                             id="titulaire<?= $cid ?>" <?= $titulaireChecked ?>>
                                                         <label class="form-check-label" for="titulaire<?= $cid ?>">
-                                                            Professeur titulaire
+                                                            Titulaire
                                                         </label>
                                                     </div>
                                                 </div>

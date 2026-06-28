@@ -6,6 +6,7 @@ $codeEcole = $_SESSION['code_ecole'] ?? '';
 
 $statut          = $_POST['statut'] ?? '';
 $eleve           = (int)($_POST['eleve'] ?? 0);
+$montant_a_payer = (int)($_POST['solde_restant'] ?? 0);
 $montant_paye    = (float)($_POST['montant_paye'] ?? 0);
 $solde           = (float)($_POST['solde'] ?? 0);
 
@@ -42,6 +43,7 @@ $sql = "
         reference,
         statut,
         eleve, 
+        montant_a_payer,
         montant_paye,
         solde,
         date_paiement,
@@ -52,6 +54,7 @@ $sql = "
         :reference,
         :statut,
         :eleve, 
+        :montant_a_payer,
         :montant_paye,
         :solde,
         NOW(),
@@ -65,6 +68,7 @@ $stmt->execute([
     ':reference'       => $reference,
     ':statut'          => $statut,
     ':eleve'           => $eleve, 
+    ':montant_a_payer' => $montant_a_payer, 
     ':montant_paye'    => $montant_paye,
     ':solde'           => $solde,
     ':code_ecole'      => $codeEcole

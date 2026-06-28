@@ -37,7 +37,30 @@ if (!$pdo) {
 $codeEcole = $_SESSION['code_ecole'] ?? '';
 
 if (empty($codeEcole)) {
-    die("Accès refusé");
+
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+
+    if ($userId > 0) {
+
+        $stmt = $pdo->prepare("
+            SELECT code_ecole
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+        ");
+
+        $stmt->execute([$userId]);
+
+        $codeEcole = $stmt->fetchColumn() ?: '';
+
+        if (!empty($codeEcole)) {
+            $_SESSION['code_ecole'] = $codeEcole;
+        }
+    }
+}
+
+if (empty($codeEcole)) {
+    die("Impossible de déterminer l'école de l'utilisateur.");
 }
 
 /* =========================================================
@@ -161,23 +184,32 @@ while ($row = $stmtConfig->fetch(PDO::FETCH_ASSOC)) {
 $sqlEleves = "
 SELECT
 
+    p.eleve,
+    p.statut,
+
     s.id,
     s.class_id,
 
     CONCAT(
-        s.first_name, ' ',
+        s.first_name,' ',
         s.last_name
     ) AS nom,
 
-    CONCAT(
-        c.classe, ' ',
-        c.description, ' ',
-        COALESCE(niv.description, ''), ' ',
-        COALESCE(sec.description, ''), ' ',
-        COALESCE(opt.description, '')
-    ) AS classe_nom
+    CONCAT_WS(
+    ' ',
+    NULLIF(TRIM(c.classe),''),
+    NULLIF(TRIM(c.description),''),
+    NULLIF(TRIM(niv.description),''),
+    NULLIF(TRIM(sec.description),''),
+    NULLIF(TRIM(opt.description),'')
+) AS classe_nom,
 
-FROM students s
+    SUM(p.montant_paye) AS total_paye
+
+FROM paiement p
+
+INNER JOIN students s
+ON s.id = p.eleve
 
 LEFT JOIN classes c
 ON c.id = s.class_id
@@ -189,13 +221,30 @@ LEFT JOIN section sec
 ON sec.id = c.section
 
 LEFT JOIN `options` opt
-ON opt.id = c.`options`
+ON opt.id = c.options
 
-WHERE s.code_ecole = ?
+WHERE
+
+    s.code_ecole = ?
+    AND p.is_validated = 1
+    AND p.statut = ?
+
+GROUP BY
+    s.id,
+    s.class_id,
+    nom,
+    classe_nom
+
+ORDER BY
+    classe_nom,
+    nom
 ";
 
 $stmtEleves = $pdo->prepare($sqlEleves);
-$stmtEleves->execute([$codeEcole]);
+$stmtEleves->execute([
+    $codeEcole,
+    $type
+]);
 
 $eleves = $stmtEleves->fetchAll(PDO::FETCH_ASSOC);
 
@@ -223,34 +272,6 @@ usort($eleves, function ($a, $b) use ($sort) {
 });
 
 /* =========================================================
-   PAIEMENTS VALIDÉS
-========================================================= */
-$sqlPaiements = "
-SELECT
-
-    eleve,
-    statut,
-    SUM(montant_paye) AS total
-
-FROM paiement
-
-WHERE code_ecole = ?
-AND is_validated = 1
-
-GROUP BY eleve, statut
-";
-
-$stmtPaiements = $pdo->prepare($sqlPaiements);
-$stmtPaiements->execute([$codeEcole]);
-
-$paiements = [];
-
-while ($p = $stmtPaiements->fetch(PDO::FETCH_ASSOC)) {
-
-    $paiements[$p['eleve']][$p['statut']] = (float)$p['total'];
-}
-
-/* =========================================================
    EXPORT DATA
 ========================================================= */
 if ($isExport) {
@@ -261,7 +282,7 @@ if ($isExport) {
 
         $montant = $config[$classeId][strtolower($type)] ?? 0;
 
-        $paye = $paiements[$e['id']][$type] ?? 0;
+        $paye = (float)$e['total_paye'];
 
         $reste = $montant - $paye;
 
@@ -437,7 +458,7 @@ $classeId = (int)$e['class_id'];
 
 $montant = $config[$classeId][strtolower($type)] ?? 0;
 
-$paye = $paiements[$e['id']][$type] ?? 0;
+$paye = (float)$e['total_paye'];
 
 $reste = $montant - $paye;
 

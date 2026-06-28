@@ -3,35 +3,92 @@ declare(strict_types=1);
 session_start();
 
 $pdo = null;
-foreach ([__DIR__.'/../database/db_connect.php', __DIR__.'/../../database/db_connect.php'] as $p) {
-    if (file_exists($p)) { require_once $p; break; }
+
+foreach ([
+    __DIR__.'/../database/db_connect.php',
+    __DIR__.'/../../database/db_connect.php'
+] as $p) {
+    if (file_exists($p)) {
+        require_once $p;
+        break;
+    }
 }
 
-if (!isset($pdo)) die("DB error");
+if (!isset($pdo)) {
+    die("Erreur de connexion");
+}
 
-function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+function h($s){
+    return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');
+}
+
 function money($v){
-    if ($v === null || $v === '') return '—';
-    return number_format((float)$v, 0, ',', ' ') . ' $';
+    return number_format((float)$v,0,',',' ').' $';
 }
 
-// INPUT
-$studentId = (int)($_GET['student_id'] ?? 0);
-$statut    = (string)($_GET['statut'] ?? '');
+/*-----------------------
+    ID DU PAIEMENT
+-----------------------*/
 
-if ($studentId <= 0 || $statut === '') {
-    die("Paramètres invalides");
+$paiementId = (int)($_GET['paiement_id'] ?? 0);
+
+if($paiementId<=0){
+    die("Paiement invalide");
 }
 
-// ETUDIANT
-$st = $pdo->prepare("
-    SELECT s.*, c.classe, c.description AS classe_desc
-    FROM students s
-    LEFT JOIN classes c ON s.class_id = c.id
-    WHERE s.id = ?
-");
-$st->execute([$studentId]);
-$student = $st->fetch(PDO::FETCH_ASSOC);
+/*-----------------------
+   RECUPERATION COMPLETE
+-----------------------*/
+
+$sql="
+SELECT
+    p.*,
+
+    s.first_name,
+    s.last_name,
+    s.gender,
+
+    c.classe,
+    c.description classe_desc,
+
+    n.description niveau,
+    sec.description section,
+    opt.description option_name
+
+FROM paiement p
+
+INNER JOIN students s
+        ON s.id=p.eleve
+
+LEFT JOIN classes c
+       ON c.id=s.class_id
+
+LEFT JOIN niveau n
+       ON n.id=c.niveau
+
+LEFT JOIN section sec
+       ON sec.id=c.section
+
+LEFT JOIN options opt
+       ON opt.id=c.options
+
+WHERE p.id=?
+
+LIMIT 1
+";
+
+$st=$pdo->prepare($sql);
+$st->execute([$paiementId]);
+
+$data=$st->fetch(PDO::FETCH_ASSOC);
+
+if(!$data){
+    die("Paiement introuvable");
+}
+
+$p=$data;
+$student=$data;
+$statut=$data['statut'];
 
 if (!$student) die("Étudiant introuvable");
 

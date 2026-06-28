@@ -91,6 +91,7 @@ $formAction = 'service/add-student.php';
 ?>
 <!doctype html>
 <html class="no-js" lang="fr">
+
 <head>
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
@@ -110,181 +111,207 @@ $formAction = 'service/add-student.php';
     <link rel="stylesheet" href="../css/datepicker.min.css">
     <link rel="stylesheet" href="../style.css">
     <script src="../js/modernizr-3.6.0.min.js"></script>
-    <style>.muted{color:#6b7280}</style>
+    <style>
+    .muted {
+        color: #6b7280
+    }
+    </style>
 </head>
 
 <body>
-<div id="preloader" class="d-none"></div>
-<div id="wrapper" class="wrapper bg-ash">
-    <?php require_once('layout/navbar.php'); ?>
-    <div class="dashboard-page-one">
-        <?php require_once('layout/sidebar.php'); ?>
+    <div id="preloader" class="d-none"></div>
+    <div id="wrapper" class="wrapper bg-ash">
+        <?php require_once('layout/navbar.php'); ?>
+        <div class="dashboard-page-one">
+            <?php require_once('layout/sidebar.php'); ?>
 
-        <div class="dashboard-content-one">
-            <div class="breadcrumbs-area d-flex align-items-center justify-content-between">
-                <h3><?= $isEdit ? 'Modifier un élève' : 'Création des élèves' ?></h3>
-                <div>
-                    <a class="btn btn-outline-secondary btn-sm" href="all-students.php">← Retour à la liste</a>
-                    <?php if ($isEdit): ?>
-                        <a class="btn btn-outline-danger btn-sm"
-                           href="delete_student.php?id=<?= (int)$editId ?>"
-                           onclick="return confirm('Supprimer cet élève (ID <?= (int)$editId ?>) ? Action irréversible.');">
-                           Supprimer
+            <div class="dashboard-content-one">
+                <div class="breadcrumbs-area d-flex align-items-center justify-content-between">
+                    <h3><?= $isEdit ? 'Modifier un élève' : 'Création des élèves' ?></h3>
+                    <div>
+                        <a class="btn btn-secondary btn-md" href="all-students.php">← Retour à la liste</a>
+                        <?php if ($isEdit): ?>
+                        <a class="btn btn-outline-danger btn-sm" href="delete_student.php?id=<?= (int)$editId ?>"
+                            onclick="return confirm('Supprimer cet élève (ID <?= (int)$editId ?>) ? Action irréversible.');">
+                            Supprimer
                         </a>
-                    <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            </div>
 
-            <div class="card height-auto">
-                <div class="card-body">
-                    <form class="new-added-form" action="<?= h($formAction) ?>" method="POST" enctype="multipart/form-data" autocomplete="off">
-                        <?php
+                <div class="card height-auto">
+                    <div class="card-body">
+                        <form class="new-added-form" action="<?= h($formAction) ?>" method="POST"
+                            enctype="multipart/form-data" autocomplete="off">
+                            <?php
                         require_once __DIR__ . '/../service/security_helpers.php';
                         csrf_input();
                         ?>
-                        <?php if ($isEdit): ?>
+                            <?php if ($isEdit): ?>
                             <input type="hidden" name="edit_id" value="<?= (int)$editId ?>">
-                        <?php endif; ?>
+                            <?php endif; ?>
 
-                        <div class="row">
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Prenom *</label>
-                                <input type="text" name="first_name" class="form-control" required value="<?= $val('first_name') ?>">
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Nom de famille *</label>
-                                <input type="text" name="last_name" class="form-control" required value="<?= $val('last_name') ?>">
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Genre *</label>
-                                <select class="select2 form-control" name="gender" required>
-                                    <option value="" disabled <?= $genderVal===''?'selected':''; ?>>Sélectionner votre genre *</option>
-                                    <option value="Homme" <?= $genderVal==='Homme'?'selected':''; ?>>Homme</option>
-                                    <option value="Femme" <?= $genderVal==='Femme'?'selected':''; ?>>Femme</option>
-                                </select>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group"></div>
+                            <div class="row">
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Prenom *</label>
+                                    <input type="text" name="first_name" class="form-control" required
+                                        value="<?= $val('first_name') ?>">
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Nom de famille *</label>
+                                    <input type="text" name="last_name" class="form-control" required
+                                        value="<?= $val('last_name') ?>">
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Genre *</label>
+                                    <select class="select2 form-control" name="gender" required>
+                                        <option value="" disabled <?= $genderVal===''?'selected':''; ?>>Sélectionner
+                                            votre genre *</option>
+                                        <option value="Homme" <?= $genderVal==='Homme'?'selected':''; ?>>Homme</option>
+                                        <option value="Femme" <?= $genderVal==='Femme'?'selected':''; ?>>Femme</option>
+                                    </select>
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group"></div>
 
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Date de naissance *</label>
-                                <input type="text" placeholder="dd/mm/yyyy" class="form-control air-datepicker" name="date_of_birth" data-position='bottom right' value="<?= h($dobVal) ?>" required>
-                                <i class="far fa-calendar-alt"></i>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>E-Mail</label>
-                                <input type="email" name="email" class="form-control" value="<?= $val('email') ?>">
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Téléphone</label>
-                                <input type="tel" name="phone" class="form-control" value="<?= $val('phone') ?>">
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group"></div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Date de naissance *</label>
+                                    <input type="text" placeholder="dd/mm/yyyy" class="form-control air-datepicker"
+                                        name="date_of_birth" data-position='bottom right' value="<?= h($dobVal) ?>"
+                                        required>
+                                    <i class="far fa-calendar-alt"></i>
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>E-Mail</label>
+                                    <input type="email" name="email" class="form-control" value="<?= $val('email') ?>">
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Téléphone</label>
+                                    <input type="tel" name="phone" class="form-control" value="<?= $val('phone') ?>">
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group"></div>
 
-                            <div class="col-lg-6 col-12 form-group mg-t-30">
-                                <label class="text-dark-medium">Téléverser photo élève <?= h($photoHelp) ?></label>
-                                <input type="file" name="photo" class="form-control-file">
-                            </div>
-                            <div class="col-lg-6 col-12 form-group mg-t-30">
-                                <label class="text-dark-medium">Téléverser les documents de l'élève</label>
-                                <input type="file" name="document" class="form-control-file">
-                            </div>
+                                <div class="col-lg-6 col-12 form-group mg-t-30">
+                                    <label class="text-dark-medium">Téléverser photo élève <?= h($photoHelp) ?></label>
+                                    <input type="file" name="photo" class="form-control-file">
+                                </div>
+                                <div class="col-lg-6 col-12 form-group mg-t-30">
+                                    <label class="text-dark-medium">Téléverser les documents de l'élève</label>
+                                    <input type="file" name="document" class="form-control-file">
+                                </div>
 
-                            <div class="col-xl-3 col-lg-6 col-12 form-group mt-3">
-                                <label>Ecole provenance *</label>
-                                <input type="text" name="ecole_provenance" class="form-control" value="<?= $val('ecole_provenance','Kelasi school') ?>" required>
-                            </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group mt-3">
+                                    <label>Ecole provenance *</label>
+                                    <input type="text" name="ecole_provenance" class="form-control"
+                                        value="<?= $val('ecole_provenance','Kelasi school') ?>" required>
+                                </div>
 
-                            <div class="col-lg-12 col-12 form-group mg-t-30">
-                                <h3 class="text-dark-medium" style="text-transform: uppercase;">info du responsable</h3>
-                                <hr>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Nom du père *</label>
-                                <input type="text" name="father" class="form-control" value="<?= $val('father') ?>" required>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Nom de la mère *</label>
-                                <input type="text" name="mother" class="form-control" value="<?= $val('mother') ?>" required>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Téléphone *</label>
-                                <input type="tel" name="phone_responsable" class="form-control" value="<?= $val('phone_responsable') ?>" required>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Email *</label>
-                                <input type="email" name="email_responsable" class="form-control" value="<?= $val('email_responsable') ?>" required>
-                            </div>
+                                <div class="col-lg-12 col-12 form-group mg-t-30">
+                                    <h3 class="text-dark-medium" style="text-transform: uppercase;">info du responsable
+                                    </h3>
+                                    <hr>
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Nom du père *</label>
+                                    <input type="text" name="father" class="form-control" value="<?= $val('father') ?>"
+                                        required>
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Nom de la mère *</label>
+                                    <input type="text" name="mother" class="form-control" value="<?= $val('mother') ?>"
+                                        required>
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Téléphone *</label>
+                                    <input type="tel" name="phone_responsable" class="form-control"
+                                        value="<?= $val('phone_responsable') ?>" required>
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Email *</label>
+                                    <input type="email" name="email_responsable" class="form-control"
+                                        value="<?= $val('email_responsable') ?>" required>
+                                </div>
 
-                            <div class="col-lg-12 col-12 form-group mg-t-30">
-                                <h3 class="text-dark-medium" style="text-transform: uppercase;">Affectation</h3>
-                                <hr>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Classe *</label>
-                                <select class="select2 form-control" name="classe" required>
-                                    <option value="">Veuillez sélectionner la classe *</option>
-                                    <?php foreach ($classes as $row):
+                                <div class="col-lg-12 col-12 form-group mg-t-30">
+                                    <h3 class="text-dark-medium" style="text-transform: uppercase;">Affectation</h3>
+                                    <hr>
+                                </div>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Classe *</label>
+                                    <select class="select2 form-control" name="classe" required>
+                                        <option value="">Veuillez sélectionner la classe *</option>
+                                        <?php foreach ($classes as $row):
                                         $cid = (int)$row['identity'];
                                         $opt = trim(($row['classe'] ?? '').($row['description'] ? ' '.$row['description'] : '').' '.($row['niveau'] ?? '').' '.($row['section'] ?? '').' '.($row['options'] ?? ''));
                                         if ($opt==='') $opt = 'Classe #'.$cid;
                                         $sel = ($cid === $selectedClassId) ? 'selected' : '';
                                     ?>
                                         <option value="<?= $cid ?>" <?= $sel ?>><?= h($opt) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
 
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Nom d'utilisateur *</label>
-                                <input type="text" name="username" class="form-control" required value="<?= $val('username') ?>">
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Mot de passe <?= $isEdit ? '(laisser vide pour ne pas changer)' : '*' ?></label>
-                                <input type="password" name="password" class="form-control" <?= $isEdit ? '' : 'required' ?>>
-                            </div>
-                            <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                <label>Confirmer le mot de passe <?= $isEdit ? '(laisser vide pour ne pas changer)' : '*' ?></label>
-                                <input type="password" name="password_confirm" class="form-control" <?= $isEdit ? '' : 'required' ?>>
-                            </div>
+                                <?php if (!$isEdit): ?>
 
-                            <div class="col-12 form-group mg-t-8">
-                                <button type="submit" class="btn-fill-lg btn-gradient-yellow btn-hover-bluedark" name="submit">
-                                    <?= $isEdit ? 'Mettre à jour' : 'Créer élève' ?>
-                                </button>
-                                <a href="all-students.php" class="btn-fill-lg bg-blue-dark btn-hover-yellow">Annuler</a>
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Nom d'utilisateur *</label>
+                                    <input type="text" name="username" class="form-control" required
+                                        value="<?= $val('username') ?>">
+                                </div>
+
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Mot de passe *</label>
+                                    <input type="password" name="password" class="form-control" required>
+                                </div>
+
+                                <div class="col-xl-3 col-lg-6 col-12 form-group">
+                                    <label>Confirmer le mot de passe *</label>
+                                    <input type="password" name="password_confirm" class="form-control" required>
+                                </div>
+
+                                <?php endif; ?>
+
+                                <div class="col-12 form-group mg-t-8">
+                                    <button type="submit" class="btn-fill-lg btn-gradient-yellow btn-hover-bluedark"
+                                        name="submit">
+                                        <?= $isEdit ? 'Mettre à jour' : 'Créer élève' ?>
+                                    </button>
+                                    <a href="all-students.php"
+                                        class="btn-fill-lg bg-blue-dark btn-hover-yellow">Annuler</a>
+                                </div>
                             </div>
-                        </div>
-                    </form>
-                    <p class="muted mb-0">
-                        <small>
-                            Astuce : ce formulaire envoie toujours vers <code>service/add-student.php</code>.
-                            Si <code>edit_id</code> est présent dans le POST, votre script doit faire un <strong>UPDATE</strong> au lieu d’un INSERT.
-                        </small>
-                    </p>
+                        </form>
+                        <!-- <p class="muted mb-0">
+                            <small>
+                                Astuce : ce formulaire envoie toujours vers <code>service/add-student.php</code>.
+                                Si <code>edit_id</code> est présent dans le POST, votre script doit faire un
+                                <strong>UPDATE</strong> au lieu d’un INSERT.
+                            </small>
+                        </p> -->
+                    </div>
                 </div>
-            </div>
 
-            <footer class="footer-wrap-layout1">
-                <div class="copyright">© MyKelasi</div>
-            </footer>
+                <?php require_once('layout/footer.php'); ?>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- JS -->
-<script src="../js/jquery-3.3.1.min.js"></script>
-<script src="../js/plugins.js"></script>
-<script src="../js/popper.min.js"></script>
-<script src="../js/bootstrap.min.js"></script>
-<script src="../js/select2.min.js"></script>
-<script src="../js/datepicker.min.js"></script>
-<script src="../js/jquery.scrollUp.min.js"></script>
-<script src="../js/jquery.dataTables.min.js"></script>
-<script src="../js/main.js"></script>
-<script>
-$(function(){
-    if ($.fn.select2) $('.select2').select2({ width:'100%' });
-});
-</script>
+    <!-- JS -->
+    <script src="../js/jquery-3.3.1.min.js"></script>
+    <script src="../js/plugins.js"></script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/select2.min.js"></script>
+    <script src="../js/datepicker.min.js"></script>
+    <script src="../js/jquery.scrollUp.min.js"></script>
+    <script src="../js/jquery.dataTables.min.js"></script>
+    <script src="../js/main.js"></script>
+    <script>
+    $(function() {
+        if ($.fn.select2) $('.select2').select2({
+            width: '100%'
+        });
+    });
+    </script>
 </body>
+
 </html>

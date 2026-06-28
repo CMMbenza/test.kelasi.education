@@ -129,4 +129,10 @@ executer dans data :
 2. Possibilité d'assigner un enseignant comme titulaire d'une classe
 
 #MAJ 23.06
-1.
+1.Modification élève
+2. Changement du nom colonne titulaire => status
+3. Mises en place de la page voir detail pour l'eleve chez l'admin qu'il puisse voir les détails de l'élève(Informations de l'élève, Responsables, Situation financière)
+4. Correction pour l'affichage de differnent frais en apercu
+5. Correction pour le mouvement de paiement avec une precision de connaitre montant à payer, payé et reste
+6. Eleve peut lire les contenus d'une lecons 
+7. L'élève peut consulter sa précense

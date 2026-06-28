@@ -139,9 +139,17 @@ if (isset($_GET['toggle_id'])) {
             <div class="dashboard-content-one">
                 <!-- Breadcubs Area Start Here -->
                 <div class="breadcrumbs-area">
-                    <h3 style="text-transform: uppercase;">Classes</h3>
-                    <a href="add-class.php" class="btn-fill-lg btn-gradient-yellow btn-hover-bluedark">Créer une
-                        classe</a>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+
+                        <h3 class="mb-0 text-uppercase">
+                            Classes
+                        </h3>
+
+                        <a href="add-class.php" class="btn-fill-lg btn-gradient-yellow btn-hover-bluedark text-nowrap">
+                            Créer une classe
+                        </a>
+
+                    </div>
                     <!-- <ul>
                         <li>
                             <a href="index.php">Home</a>
@@ -153,7 +161,7 @@ if (isset($_GET['toggle_id'])) {
                 <!-- Class Table Area Start Here -->
                 <div class="card height-auto">
                     <div class="card-body">
-                        <div class="heading-layout1">
+                        <!-- <div class="heading-layout1">
                             <div class="item-title">
                                 <div class="d-block justify-content-between w-100 p-2">
                                     <span class="badge bg-success text-white" style="margin-left 10px;">
@@ -165,7 +173,7 @@ if (isset($_GET['toggle_id'])) {
 
                                 </div>
                             </div>
-                        </div>
+                        </div> -->
                         <!-- <form class="mg-b-20">
                             <div class="row gutters-8">
                                 <div class="col-3-xxxl col-xl-3 col-lg-3 col-12 form-group">
