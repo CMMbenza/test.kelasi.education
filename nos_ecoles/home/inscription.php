@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         // Champs
         $first_name = trim((string)($_POST['first_name'] ?? ''));
         $last_name  = trim((string)($_POST['last_name'] ?? ''));
-        $gender     = trim((string)($_POST['gender'] ?? ''));
+        $gender = strtolower(trim((string)($_POST['gender'] ?? '')));
         $date_of_birth = trim((string)($_POST['date_of_birth'] ?? ''));
         $email      = trim((string)($_POST['email'] ?? ''));
         $phone      = trim((string)($_POST['phone'] ?? ''));
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
         // Validations
         if ($first_name==='' || $last_name==='') throw new RuntimeException("Prénoms/Noms requis.");
-        if (!in_array($gender, ['Homme','Femme'], true)) throw new RuntimeException("Genre invalide.");
+        if (!in_array($gender, ['homme', 'femme'], true)) {throw new RuntimeException("Genre invalide.");}
         if ($date_of_birth==='') throw new RuntimeException("Date de naissance requise.");
         if ($email!=='' && !is_email($email)) throw new RuntimeException("Email élève invalide.");
         if (!is_phone($phone)) throw new RuntimeException("Téléphone élève invalide.");
@@ -369,7 +369,8 @@ try {
                             <div class="col-xl-4 mb-3 col-lg-6 col-12 form-group">
                                 <label>Genre *</label>
                                 <select class="select2 form-control" name="gender" required>
-                                    <option value="" disabled <?= old('gender')===''?'selected':''; ?>>Sélectionner votre genre *</option>
+                                    <option value="" disabled <?= old('gender')===''?'selected':''; ?>>Sélectionner
+                                        votre genre *</option>
                                     <option value="Homme" <?= old('gender')==='Homme'?'selected':''; ?>>Homme</option>
                                     <option value="Femme" <?= old('gender')==='Femme'?'selected':''; ?>>Femme</option>
                                 </select>
@@ -392,14 +393,16 @@ try {
                             </div>
 
                             <div class="col-lg-6 col-12 form-group mg-t-30">
-                                <label class="text-dark-medium">Télécharger la photo de l'élève (150 px x 150 px) — JPG/PNG/WEBP (max.
+                                <label class="text-dark-medium">Télécharger la photo de l'élève (150 px x 150 px) —
+                                    JPG/PNG/WEBP (max.
                                     <?= $MAX_PHOTO_MB ?> Mo)</label>
                                 <input type="file" name="photo" class="form-control"
                                     accept=".jpg,.jpeg,.png,.webp,image/*" id="photoInput">
                                 <img id="photoPreview" class="preview d-none" alt="Prévisualisation">
                             </div>
                             <div class="col-lg-6 col-12 form-group mg-t-30">
-                                <label class="text-dark-medium">Téléverser les documents de l'étudiant — PDF/JPG/PNG (max
+                                <label class="text-dark-medium">Téléverser les documents de l'étudiant — PDF/JPG/PNG
+                                    (max
                                     <?= $MAX_DOC_MB ?> Mo chacun)</label>
                                 <input type="file" name="documents[]" class="form-control"
                                     accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" multiple>

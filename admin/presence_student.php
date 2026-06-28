@@ -1,13 +1,32 @@
 <?php
 declare(strict_types=1);
 
-session_start();
-require_once __DIR__.'/../database/db_connect.php';
+if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+
+// ---- DB ----
+$pdo = null;
+foreach ([__DIR__.'/../database/db_connect.php', __DIR__.'/../../database/db_connect.php', __DIR__.'/database/db_connect.php'] as $p) {
+    if (file_exists($p)) { require_once $p; break; }
+}
+if (!isset($pdo) || !($pdo instanceof PDO)) { http_response_code(500); exit('Erreur serveur (DB).'); }
+
+// ---- Auth ----
+$userId = (int)($_SESSION['user_id'] ?? 0);
+$role   = strtolower((string)($_SESSION['role'] ?? ''));
+$isAdmin = in_array($role, ['admin','administrateur'], true);
 
 function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
-$codeEcole = $_SESSION['code_ecole'] ?? '';
+$codeEcole = (string)($_SESSION['code_ecole'] ?? '');
 $mois = date('Y-m');
+
+if ($userId && !$codeEcole) {
+    $st = $pdo->prepare("SELECT code_ecole FROM users WHERE id=:id LIMIT 1");
+    $st->execute([':id'=>$userId]);
+    $codeEcole = (string)($st->fetchColumn() ?: '');
+    if ($codeEcole) $_SESSION['code_ecole'] = $codeEcole;
+}
+if (!$isAdmin || !$codeEcole) { http_response_code(403); exit('Accès refusé'); }
 
 $classeFilter = $_GET['classe'] ?? '';
 
@@ -42,13 +61,23 @@ SELECT
     p.eleve_id,
     s.first_name,
     s.last_name,
-    c.description AS classe,
+    CONCAT_WS(
+        ' ',
+        NULLIF(TRIM(c.classe), ''),
+        NULLIF(TRIM(c.description), ''),
+        NULLIF(TRIM(niv.description), ''),
+        NULLIF(TRIM(sec.description), ''),
+        NULLIF(TRIM(opt.description), '')
+    ) AS classe,
     COUNT(CASE WHEN p.statut='present' THEN 1 END) AS total_present,
     COUNT(CASE WHEN p.statut='absent' THEN 1 END) AS total_absent,
     COUNT(p.id) AS total_jours
 FROM presence_eleve p
 INNER JOIN students s ON s.id = p.eleve_id
 INNER JOIN classes c ON c.id = p.class_id
+LEFT JOIN niveau niv ON niv.id = c.niveau
+LEFT JOIN section sec ON sec.id = c.section
+LEFT JOIN options opt ON opt.id = c.options
 WHERE s.code_ecole = :ce
 AND DATE_FORMAT(p.date_presence,'%Y-%m') = :mois
 ";
@@ -196,7 +225,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
 
-                    <div class="modal-header bg-primary text-white">
+                    <div class="modal-header text-white">
                         <h5>Détails présence élève</h5>
                     </div>
 
@@ -209,7 +238,16 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
         <script src="../js/jquery-3.3.1.min.js"></script>
+        <script src="../js/plugins.js"></script>
+        <script src="../js/popper.min.js"></script>
         <script src="../js/bootstrap.min.js"></script>
+        <script src="../js/jquery.counterup.min.js"></script>
+        <script src="../js/moment.min.js"></script>
+        <script src="../js/jquery.waypoints.min.js"></script>
+        <script src="../js/jquery.scrollUp.min.js"></script>
+        <script src="../js/fullcalendar.min.js"></script>
+        <script src="../js/Chart.min.js"></script>
+        <script src="../js/main.js"></script>
 
         <script>
         $('.btn-detail').click(function() {
