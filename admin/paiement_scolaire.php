@@ -139,7 +139,7 @@ $students = $students->fetchAll(PDO::FETCH_ASSOC);
                                     <!-- SOLDE RESTANT -->
                                     <div class="form-group">
                                         <label>Solde restant $</label>
-                                        <input type="number" id="solde_restant" class="form-control" readonly>
+                                        <input type="number" name="solde_restant" id="solde_restant" class="form-control" readonly>
                                     </div>
                                 </div>
                                 <div class="col-6">

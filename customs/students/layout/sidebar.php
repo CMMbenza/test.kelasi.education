@@ -103,8 +103,8 @@
                      </li>
                      <li class="nav-item">
                          <a href="mes_cours.php" class="nav-link">
-                             <<i class="fas fa-book"></i>
-                                 Mes cours
+                             <i class="fas fa-book"></i>
+                             Mes cours
                          </a>
                      </li>
                      <!--<li class="nav-item">-->

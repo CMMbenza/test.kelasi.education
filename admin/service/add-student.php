@@ -2,6 +2,7 @@
 require '../../database/db_connect.php';
 require 'user_connecter.php';
 require '../../service/security_helpers.php';
+require 'email_send_student.php';
 
 $code_ecole = $_SESSION['code_ecole'] ?? null;
 
@@ -10,32 +11,45 @@ csrf_protect();
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     try {
+
         if ($_SERVER['CONTENT_LENGTH'] > 50 * 1024 * 1024) {
             die("Fichier trop volumineux !");
         }
-        // 🔐 START TRANSACTION
+
         $pdo->beginTransaction();
 
-        // 📥 Données
-        $first_name         = $_POST['first_name'];
-        $last_name          = $_POST['last_name'];
-        $username           = $_POST['username'];
-        $gender             = $_POST['gender'];
-        $dob_input          = $_POST['date_of_birth'];
-        $dob                = date('Y-m-d', strtotime(str_replace('/', '-', $dob_input)));
-        $email              = $_POST['email'];
-        $phone              = $_POST['phone'];
-        $classe             = $_POST['classe'];
-        $father             = $_POST['father'];
-        $mother             = $_POST['mother'];
-        $phone_responsable  = $_POST['phone_responsable'];
-        $email_responsable  = $_POST['email_responsable'];
-        $password_plain     = $_POST['password'];
-        $password           = password_hash($password_plain, PASSWORD_DEFAULT);
-        $statut             = 'valide';
-        $ecole_provenance   = $_POST['ecole_provenance'];
+        // =========================
+        // DONNÉES
+        // =========================
+        $edit_id           = isset($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
+        $isEdit            = $edit_id > 0;
 
-        // 🔒 Vérifier classe appartient à l’école
+        $first_name        = $_POST['first_name'];
+        $last_name         = $_POST['last_name'];
+        $username          = $_POST['username'];
+        $gender            = $_POST['gender'];
+
+        $dob_input         = $_POST['date_of_birth'];
+        $dob               = date('Y-m-d', strtotime(str_replace('/', '-', $dob_input)));
+
+        $email             = $_POST['email'];
+        $phone             = $_POST['phone'];
+        $classe            = $_POST['classe'];
+
+        $father            = $_POST['father'];
+        $mother            = $_POST['mother'];
+        $phone_responsable = $_POST['phone_responsable'];
+        $email_responsable = $_POST['email_responsable'];
+
+        $password_plain    = $_POST['password'] ?? '';
+        $password          = $password_plain ? password_hash($password_plain, PASSWORD_DEFAULT) : null;
+
+        $ecole_provenance  = $_POST['ecole_provenance'];
+        $statut            = 'valide';
+
+        // =========================
+        // CHECK CLASSE
+        // =========================
         $chk = $pdo->prepare("SELECT COUNT(*) FROM classes WHERE id = ? AND code_ecole = ?");
         $chk->execute([$classe, $code_ecole]);
 
@@ -43,62 +57,214 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             throw new Exception("Classe invalide.");
         }
 
-        // 🚫 Vérifier doublon username/email dans users
-        $checkUser = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ? OR email = ?");
-        $checkUser->execute([$username, $email]);
+        // =========================
+        // DUPLICAT CHECK PROPRE
+        // =========================
+        if ($isEdit) {
+
+            // récupérer ancien élève
+            $stOld = $pdo->prepare("SELECT username, email FROM students WHERE id=? LIMIT 1");
+            $stOld->execute([$edit_id]);
+            $old = $stOld->fetch(PDO::FETCH_ASSOC);
+
+            if (!$old) {
+                throw new Exception("Élève introuvable.");
+            }
+
+            $checkUser = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM users
+                WHERE (username = ? OR email = ?)
+                AND NOT (username = ? OR email = ?)
+            ");
+
+            $checkUser->execute([
+                $username,
+                $email,
+                $old['username'],
+                $old['email']
+            ]);
+
+        } else {
+
+            $checkUser = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM users
+                WHERE username = ? OR email = ?
+            ");
+
+            $checkUser->execute([$username, $email]);
+        }
 
         if ($checkUser->fetchColumn() > 0) {
             throw new Exception("Username ou email déjà utilisé.");
         }
 
         // =========================
-        // ✅ INSERT STUDENT
+        // INSERT MODE
         // =========================
-        $sqlStudent = "INSERT INTO students (
-            first_name, last_name, username, gender, date_of_birth,
-            email, phone, class_id, PASSWORD, father, mother,
-            phone_responsable, email_responsable, code_ecole,
-            ecole_provenance, statut
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        if (!$isEdit) {
 
-        $stmtStudent = $pdo->prepare($sqlStudent);
-        $stmtStudent->execute([
-            $first_name, $last_name, $username, $gender, $dob,
-            $email, $phone, $classe, $password, $father, $mother,
-            $phone_responsable, $email_responsable, $code_ecole,
-            $ecole_provenance, $statut
-        ]);
+            $stmtStudent = $pdo->prepare("
+                INSERT INTO students (
+                    first_name,last_name,username,gender,date_of_birth,
+                    email,phone,class_id,password,father,mother,
+                    phone_responsable,email_responsable,
+                    code_ecole,ecole_provenance,statut
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ");
+
+            $stmtStudent->execute([
+                $first_name,
+                $last_name,
+                $username,
+                $gender,
+                $dob,
+                $email,
+                $phone,
+                $classe,
+                $password,
+                $father,
+                $mother,
+                $phone_responsable,
+                $email_responsable,
+                $code_ecole,
+                $ecole_provenance,
+                $statut
+            ]);
+
+            $stmtUser = $pdo->prepare("
+                INSERT INTO users (
+                    username,password,email,role,
+                    first_name,last_name,phone,code_ecole
+                ) VALUES (?,?,?,?,?,?,?,?)
+            ");
+
+            $stmtUser->execute([
+                $username,
+                $password,
+                $email,
+                'eleve',
+                $first_name,
+                $last_name,
+                $phone,
+                $code_ecole
+            ]);
+        }
 
         // =========================
-        // ✅ INSERT USER (LOGIN)
+        // UPDATE MODE
         // =========================
-        $sqlUser = "INSERT INTO users (
-            username, PASSWORD, email, role,
-            first_name, last_name, phone, code_ecole
-        ) VALUES (?, ?, ?, 'eleve', ?, ?, ?, ?)";
+        else {
 
-        $stmtUser = $pdo->prepare($sqlUser);
-        $stmtUser->execute([
-            $username,
-            $password,
-            $email,
-            $first_name,
-            $last_name,
-            $phone,
-            $code_ecole
-        ]);
+            $sqlStudent = "
+                UPDATE students SET
+                    first_name=?,
+                    last_name=?, 
+                    gender=?,
+                    date_of_birth=?,
+                    email=?,
+                    phone=?,
+                    class_id=?,
+                    father=?,
+                    mother=?,
+                    phone_responsable=?,
+                    email_responsable=?,
+                    ecole_provenance=?
+            ";
 
-        // ✅ VALIDATION
+            $paramsStudent = [
+                $first_name,
+                $last_name, 
+                $gender,
+                $dob,
+                $email,
+                $phone,
+                $classe,
+                $father,
+                $mother,
+                $phone_responsable,
+                $email_responsable,
+                $ecole_provenance
+            ];
+
+            if ($password) {
+                $sqlStudent .= ", password=?";
+                $paramsStudent[] = $password;
+            }
+
+            $sqlStudent .= " WHERE id=? AND code_ecole=?";
+            $paramsStudent[] = $edit_id;
+            $paramsStudent[] = $code_ecole;
+
+            $stmt = $pdo->prepare($sqlStudent);
+            $stmt->execute($paramsStudent);
+
+            // update users (sans relation ID → on utilise email)
+            $sqlUser = "
+                UPDATE users SET 
+                    email=?,
+                    first_name=?,
+                    last_name=?,
+                    phone=?
+            ";
+
+            $paramsUser = [ 
+                $email,
+                $first_name,
+                $last_name,
+                $phone
+            ];
+
+            if ($password) {
+                $sqlUser .= ", password=?";
+                $paramsUser[] = $password;
+            }
+
+            $sqlUser .= " WHERE email=?";
+            $paramsUser[] = $old['email'];
+
+            $stmt = $pdo->prepare($sqlUser);
+            $stmt->execute($paramsUser);
+        }
+
+        // =========================
+        // COMMIT
+        // =========================
         $pdo->commit();
 
-        header('Location: ../all-students.php?msg=created');
+        // =========================
+        // EMAIL (UNIQUEMENT INSERT)
+        // =========================
+        if (!$isEdit) {
+
+            $loginUrl = kelasi_login_url();
+
+            $emails = array_unique(array_filter([
+                $email,
+                $email_responsable
+            ]));
+
+            foreach ($emails as $mail) {
+
+                send_student_credentials($mail, [
+                    'first'      => $first_name,
+                    'last'       => $last_name,
+                    'username'   => $username,
+                    'password'   => $password_plain,
+                    'code_ecole' => $code_ecole,
+                    'ecole_name' => $_SESSION['nom_ecole'] ?? 'Kelasi',
+                    'login_url'  => $loginUrl
+                ]);
+            }
+        }
+
+        header('Location: ../all-students.php?msg=success');
         exit;
 
     } catch (Exception $e) {
 
-        // ❌ rollback si erreur
         $pdo->rollBack();
-
         echo "Erreur : " . $e->getMessage();
     }
 }

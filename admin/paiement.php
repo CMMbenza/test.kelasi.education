@@ -33,72 +33,67 @@ if (!$codeEcole) {
 // --- Récupère les lignes pour un statut donné + la table de config correspondante
 // $statut ∈ {'Inscription','Minerval','Autre'}
 // $cfgTable ∈ {'frais_d_inscription','minerval','autres_frais'}
-function fetchRows(PDO $pdo, string $statut, string $cfgTable, ?string $codeEcole=null): array {
-    // Colonne(s) additionnelles spécifiques aux "Autres frais"
-    $extraCols = '';
-    if ($cfgTable === 'autres_frais') {
-        // expose la description du config (libellé du frais)
-        $extraCols = ", cfg.description AS autres_frais_description";
-    }
-
-    // Jointure sur la dernière ligne de paiement par élève pour le statut donné (via MAX(id))
-    // Montant fixé via table config "cfg" jointe sur (code_ecole, niveau, section, OPTION, classe)
+function fetchRows(PDO $pdo, string $statut, string $codeEcole): array
+{
     $sql = "
-        SELECT
-            s.id            AS students_id,
-            s.first_name,
-            s.last_name,
-            s.gender,
-            s.code_ecole,
-            c.classe,
-            c.description   AS classe_desc,
-            n.description   AS niveau_label,
-            sec.description AS section_label,
-            opt.description AS option_label,
-            p.montant_paye,
-            p.date_paiement,
-            p.solde,
-            cfg.montant     AS montant_fixe
-            {$extraCols}
-        FROM students s
-        LEFT JOIN classes  c   ON s.class_id = c.id
-        LEFT JOIN niveau   n   ON c.niveau  = n.id
-        LEFT JOIN section  sec ON c.section = sec.id
-        LEFT JOIN options  opt ON c.options = opt.id
+    SELECT
+        p.id,
+        p.eleve,
+        p.montant_a_payer,
+        p.montant_paye,
+        p.solde,
+        p.date_paiement,
 
-        LEFT JOIN paiement p
-            ON p.id = (
-                SELECT MAX(p2.id) FROM paiement p2
-                WHERE p2.eleve = s.id AND p2.statut = :statut
-            )
+        s.first_name,
+        s.last_name,
+        s.gender,
 
-        LEFT JOIN {$cfgTable} cfg
-            ON cfg.code_ecole = s.code_ecole
-           AND cfg.niveau     = c.niveau
-           AND cfg.section    = c.section
-           AND cfg.`OPTION`   = c.options
-           AND cfg.classe     = c.id
+        c.classe,
+        c.description AS classe_desc,
+
+        n.description AS niveau_label,
+        sec.description AS section_label,
+        opt.description AS option_label
+
+    FROM paiement p
+
+    INNER JOIN students s
+        ON s.id=p.eleve
+
+    LEFT JOIN classes c
+        ON c.id=s.class_id
+
+    LEFT JOIN niveau n
+        ON n.id=c.niveau
+
+    LEFT JOIN section sec
+        ON sec.id=c.section
+
+    LEFT JOIN options opt
+        ON opt.id=c.options
+
+    WHERE
+        p.statut=:statut
+        AND s.code_ecole=:ce
+        AND DATE(p.date_paiement)=CURDATE()
+
+    ORDER BY p.date_paiement DESC
     ";
 
-    $params = [':statut'=>$statut];
+    $st=$pdo->prepare($sql);
 
-    // Scoper par école si présent
-    if (!empty($codeEcole)) {
-        $sql .= " WHERE s.code_ecole = :ce ";
-        $params[':ce'] = $codeEcole;
-    }
+    $st->execute([
+        ':statut'=>$statut,
+        ':ce'=>$codeEcole
+    ]);
 
-    $sql .= " ORDER BY s.id DESC LIMIT 5";
-
-    $st = $pdo->prepare($sql);
-    $st->execute($params);
-    return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    return $st->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // --- Datasets pour les 3 onglets ---
-$rowsInscription = fetchRows($pdo, 'Inscription', 'frais_d_inscription', $codeEcole);
-$rowsMinerval    = fetchRows($pdo, 'Minerval',    'minerval',           $codeEcole);
-$rowsAutres      = fetchRows($pdo, 'Autre',       'autres_frais',       $codeEcole);
+$rowsInscription = fetchRows($pdo, 'Inscription', $codeEcole);
+$rowsMinerval    = fetchRows($pdo, 'Minerval', $codeEcole);
+$rowsAutres      = fetchRows($pdo, 'Autre', $codeEcole);
 
 $totalInscription = 0;
 $totalMinerval = 0;
@@ -244,10 +239,10 @@ foreach ($rowsAutres as $r) {
                                                             <th>Photo</th>
                                                             <th>Nom</th>
                                                             <th>Classe</th>
-                                                            <th class="text-dange">Montant fixé</th>
-                                                            <th>Montant payé</th>
+                                                            <th class="text-dange">A payer</th>
+                                                            <th>Payé</th>
+                                                            <th>Solde(Reste)</th>
                                                             <th>Date de paiement</th>
-                                                            <th>Solde</th>
                                                             <th></th>
                                                         </tr>
                                                     </thead>
@@ -272,15 +267,15 @@ foreach ($rowsAutres as $r) {
                                                             <td><?= h($fullName) ?></td>
                                                             <td><?= h($classeLbl) ?></td>
                                                             <td class="text-dange">
-                                                                <?= money($r['montant_fixe'] ?? null) ?></td>
+                                                                <?= money($r['montant_a_payer'] ?? null) ?></td>
                                                             <td><?= money($r['montant_paye'] ?? null) ?></td>
+                                                            <td class="text-dange"><?= money($r['solde'] ?? null) ?>
+                                                            </td>
                                                             <td><?= h($r['date_paiement'] ?? '—') ?></td>
-                                                            <td><?= money($r['solde'] ?? null) ?></td>
                                                             <td class="text-center">
-                                                                <button class="btn btn-md btn-primary btn-print"
+                                                                <button class="btn btn-danger btn-print"
                                                                     data-toggle="modal" data-target="#recuModal"
-                                                                    data-id="<?= (int)$r['students_id'] ?>"
-                                                                    data-statut="Inscription">
+                                                                    data-paiement="<?= (int)$r['id'] ?>">
                                                                     <i class="fas fa-print"></i> Imprimer
                                                                 </button>
                                                             </td>
@@ -323,10 +318,10 @@ foreach ($rowsAutres as $r) {
                                                             <th>Photo</th>
                                                             <th>Nom</th>
                                                             <th>Classe</th>
-                                                            <th class="text-dange">Montant fixé</th>
-                                                            <th>Montant payé</th>
+                                                            <th class="text-dange">A payer</th>
+                                                            <th>Payé</th>
+                                                            <th class="text-danger">Solde (Reste)</th>
                                                             <th>Date de paiement</th>
-                                                            <th>Solde</th>
                                                             <th></th>
                                                         </tr>
                                                     </thead>
@@ -351,15 +346,15 @@ foreach ($rowsAutres as $r) {
                                                             <td><?= h($fullName) ?></td>
                                                             <td><?= h($classeLbl) ?></td>
                                                             <td class="text-dange">
-                                                                <?= money($r['montant_fixe'] ?? null) ?></td>
+                                                                <?= money($r['montant_a_payer'] ?? null) ?></td>
                                                             <td><?= money($r['montant_paye'] ?? null) ?></td>
+                                                            <td class="text-danger"><?= money($r['solde'] ?? null) ?>
+                                                            </td>
                                                             <td><?= h($r['date_paiement'] ?? '—') ?></td>
-                                                            <td><?= money($r['solde'] ?? null) ?></td>
                                                             <td class="text-center">
-                                                                <button class="btn btn-md btn-primary btn-print"
+                                                                <button class="btn btn-danger btn-print"
                                                                     data-toggle="modal" data-target="#recuModal"
-                                                                    data-id="<?= (int)$r['students_id'] ?>"
-                                                                    data-statut="Minerval">
+                                                                    data-paiement="<?= (int)$r['id'] ?>">
                                                                     <i class="fas fa-print"></i> Imprimer
                                                                 </button>
                                                             </td>
@@ -403,10 +398,10 @@ foreach ($rowsAutres as $r) {
                                                             <th>Nom</th>
                                                             <th>Classe</th>
                                                             <th>Description</th>
-                                                            <th class="text-dange">Montant fixé</th>
-                                                            <th>Montant payé</th>
-                                                            <th>Date de paiement</th>
+                                                            <th class="text-dange">A Payer</th>
+                                                            <th>Payé</th>
                                                             <th>Solde</th>
+                                                            <th>Date de paiement</th>
                                                             <th></th>
                                                         </tr>
                                                     </thead>
@@ -433,15 +428,14 @@ foreach ($rowsAutres as $r) {
                                                             <td><?= h($classeLbl) ?></td>
                                                             <td><?= h($desc ?: '—') ?></td>
                                                             <td class="text-dange">
-                                                                <?= money($r['montant_fixe'] ?? null) ?></td>
+                                                                <?= money($r['montant_a_payer'] ?? null) ?></td>
                                                             <td><?= money($r['montant_paye'] ?? null) ?></td>
-                                                            <td><?= h($r['date_paiement'] ?? '—') ?></td>
                                                             <td><?= money($r['solde'] ?? null) ?></td>
+                                                            <td><?= h($r['date_paiement'] ?? '—') ?></td>
                                                             <td class="text-center">
-                                                                <button class="btn btn-md btn-primary btn-print"
+                                                                <button class="btn btn-danger btn-print"
                                                                     data-toggle="modal" data-target="#recuModal"
-                                                                    data-id="<?= (int)$r['students_id'] ?>"
-                                                                    data-statut="Autre">
+                                                                    data-paiement="<?= (int)$r['id'] ?>">
                                                                     <i class="fas fa-print"></i> Imprimer
                                                                 </button>
                                                             </td>
@@ -526,19 +520,16 @@ foreach ($rowsAutres as $r) {
 
     $('.btn-print').on('click', function() {
 
-        let id = $(this).data('id');
-        let statut = $(this).data('statut');
+        let paiement = $(this).data('paiement');
 
-        $('#recuContent').html('<div class="text-center p-5">Chargement...</div>');
-
-        recuFrame = {
-            id,
-            statut
-        };
+        $('#recuContent').html(
+            '<div class="text-center p-5">Chargement...</div>'
+        );
 
         $('#recuContent').load(
-            'service/recu_ajax.php?student_id=' + id + '&statut=' + statut
+            'service/recu_ajax.php?paiement_id=' + paiement
         );
+
     });
 
     function printRecu() {
