@@ -60,10 +60,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // =========================
         // DUPLICAT CHECK PROPRE
         // =========================
+        $old = null;
         if ($isEdit) {
 
-            // récupérer ancien élève
-            $stOld = $pdo->prepare("SELECT username, email FROM students WHERE id=? LIMIT 1");
+            // récupérer ancien élève avec id_user
+            $stOld = $pdo->prepare("SELECT username, email, id_user FROM students WHERE id=? LIMIT 1");
             $stOld->execute([$edit_id]);
             $old = $stOld->fetch(PDO::FETCH_ASSOC);
 
@@ -105,13 +106,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // =========================
         if (!$isEdit) {
 
+            // 1. Créer l'utilisateur dans 'users'
+            $stmtUser = $pdo->prepare("
+                INSERT INTO users (
+                    username, password, email, role,
+                    first_name, last_name, phone, code_ecole
+                ) VALUES (?,?,?,?,?,?,?,?)
+            ");
+
+            $stmtUser->execute([
+                $username,
+                $password,
+                $email,
+                'eleve',
+                $first_name,
+                $last_name,
+                $phone,
+                $code_ecole
+            ]);
+
+            // 2. Récupérer l'ID de l'utilisateur généré
+            $id_user = $pdo->lastInsertId();
+
+            // 3. Insérer dans 'students' avec l me id_user
             $stmtStudent = $pdo->prepare("
                 INSERT INTO students (
-                    first_name,last_name,username,gender,date_of_birth,
-                    email,phone,class_id,password,father,mother,
-                    phone_responsable,email_responsable,
-                    code_ecole,ecole_provenance,statut
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    first_name, last_name, username, gender, date_of_birth,
+                    email, phone, class_id, password, father, mother,
+                    phone_responsable, email_responsable,
+                    code_ecole, ecole_provenance, statut, id_user
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ");
 
             $stmtStudent->execute([
@@ -130,25 +154,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $email_responsable,
                 $code_ecole,
                 $ecole_provenance,
-                $statut
-            ]);
-
-            $stmtUser = $pdo->prepare("
-                INSERT INTO users (
-                    username,password,email,role,
-                    first_name,last_name,phone,code_ecole
-                ) VALUES (?,?,?,?,?,?,?,?)
-            ");
-
-            $stmtUser->execute([
-                $username,
-                $password,
-                $email,
-                'eleve',
-                $first_name,
-                $last_name,
-                $phone,
-                $code_ecole
+                $statut,
+                $id_user
             ]);
         }
 
@@ -200,32 +207,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt = $pdo->prepare($sqlStudent);
             $stmt->execute($paramsStudent);
 
-            // update users (sans relation ID → on utilise email)
-            $sqlUser = "
-                UPDATE users SET 
-                    email=?,
-                    first_name=?,
-                    last_name=?,
-                    phone=?
-            ";
+            // Mettre à jour 'users' directement via id_user (plus sûr que l'email)
+            if (!empty($old['id_user'])) {
+                $sqlUser = "
+                    UPDATE users SET 
+                        email=?,
+                        first_name=?,
+                        last_name=?,
+                        phone=?
+                ";
 
-            $paramsUser = [ 
-                $email,
-                $first_name,
-                $last_name,
-                $phone
-            ];
+                $paramsUser = [ 
+                    $email,
+                    $first_name,
+                    $last_name,
+                    $phone
+                ];
 
-            if ($password) {
-                $sqlUser .= ", password=?";
-                $paramsUser[] = $password;
+                if ($password) {
+                    $sqlUser .= ", password=?";
+                    $paramsUser[] = $password;
+                }
+
+                $sqlUser .= " WHERE id=?";
+                $paramsUser[] = $old['id_user'];
+
+                $stmt = $pdo->prepare($sqlUser);
+                $stmt->execute($paramsUser);
             }
-
-            $sqlUser .= " WHERE email=?";
-            $paramsUser[] = $old['email'];
-
-            $stmt = $pdo->prepare($sqlUser);
-            $stmt->execute($paramsUser);
         }
 
         // =========================

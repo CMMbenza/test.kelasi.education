@@ -172,6 +172,7 @@ if ($studentId && $classId) {
     }
 }
 
+require_once __DIR__ . '/../layout/check_payment.php';
 ?>
 <!doctype html>
 <html lang="fr">

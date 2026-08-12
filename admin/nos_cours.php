@@ -79,43 +79,22 @@ if (
         ";
 
         $stmt = $pdo->prepare($sql);
-
-        $stmt->execute([
-            ':cours' => $deleteId
-        ]);
+        $stmt->execute([':cours' => $deleteId]);
 
         // Supprimer leçons
-        $stmt = $pdo->prepare("
-            DELETE FROM lecons
-            WHERE cours_id = :cours
-        ");
+        $stmt = $pdo->prepare("DELETE FROM lecons WHERE cours_id = :cours");
+        $stmt->execute([':cours' => $deleteId]);
 
-        $stmt->execute([
-            ':cours' => $deleteId
-        ]);
-
-        // Supprimer quiz liés à la classe/prof du cours
-        $stmtCoursInfo = $pdo->prepare("
-            SELECT class, teacher_user_id
-            FROM cours
-            WHERE id = :id
-            LIMIT 1
-        ");
-
-        $stmtCoursInfo->execute([
-            ':id' => $deleteId
-        ]);
-
+        // Supprimer quiz liés
+        $stmtCoursInfo = $pdo->prepare("SELECT class, teacher_user_id FROM cours WHERE id = :id LIMIT 1");
+        $stmtCoursInfo->execute([':id' => $deleteId]);
         $coursInfo = $stmtCoursInfo->fetch(PDO::FETCH_ASSOC);
 
         if ($coursInfo) {
-
             $stmtQuiz = $pdo->prepare("
                 DELETE FROM quizzes
-                WHERE class_id = :class_id
-                AND teacher_user_id = :teacher
+                WHERE class_id = :class_id AND teacher_user_id = :teacher
             ");
-
             $stmtQuiz->execute([
                 ':class_id' => $coursInfo['class'],
                 ':teacher'  => $coursInfo['teacher_user_id']
@@ -123,12 +102,7 @@ if (
         }
 
         // Supprimer cours
-        $stmt = $pdo->prepare("
-            DELETE FROM cours
-            WHERE id = :id
-            AND code_ecole = :code_ecole
-        ");
-
+        $stmt = $pdo->prepare("DELETE FROM cours WHERE id = :id AND code_ecole = :code_ecole");
         $stmt->execute([
             ':id'          => $deleteId,
             ':code_ecole' => $code_ecole
@@ -140,21 +114,13 @@ if (
         exit;
 
     } catch (Throwable $e) {
-
         $pdo->rollBack();
-
         die($e->getMessage());
     }
 }
 
 // ===============================
-// PARAMS
-// ===============================
-$cours_id = isset($_GET['cours_id']) ? (int)$_GET['cours_id'] : 0;
-$lecon_id = isset($_GET['lecon_id']) ? (int)$_GET['lecon_id'] : 0;
-
-// ===============================
-// COURS
+// RÉCUPÉRATION COMPLÈTE DES DONNÉES (COURS + LEÇONS + CONTENUS)
 // ===============================
 $sqlCours = "
 SELECT
@@ -162,244 +128,102 @@ SELECT
     crs.nom,
     crs.created_at,
     crs.teacher_user_id,
-
     u.first_name,
     u.last_name,
-
     c.classe,
     c.description AS classe_desc,
-
     n.description AS niveau,
     s.description AS section,
     o.description AS opt
-
 FROM cours crs
-
-INNER JOIN classes c
-ON c.id = crs.class
-
-LEFT JOIN users u
-ON u.id = crs.teacher_user_id
-
-LEFT JOIN niveau n
-ON n.id = c.niveau
-
-LEFT JOIN section s
-ON s.id = c.section
-
-LEFT JOIN options o
-ON o.id = c.options
-
+INNER JOIN classes c ON c.id = crs.class
+LEFT JOIN users u ON u.id = crs.teacher_user_id
+LEFT JOIN niveau n ON n.id = c.niveau
+LEFT JOIN section s ON s.id = c.section
+LEFT JOIN options o ON o.id = c.options
 WHERE crs.code_ecole = :code_ecole
-
 ORDER BY crs.id DESC
 ";
 
 $stmtCours = $pdo->prepare($sqlCours);
+$stmtCours->execute([':code_ecole' => $code_ecole]);
+$coursList = $stmtCours->fetchAll(PDO::FETCH_ASSOC);
 
-$stmtCours->execute([
-    ':code_ecole' => $code_ecole
-]);
+$fullData = [];
 
-$cours = $stmtCours->fetchAll(PDO::FETCH_ASSOC);
+foreach ($coursList as $c) {
+    $coursId = (int)$c['id'];
+    
+    // Récupérer les leçons du cours
+    $stmtL = $pdo->prepare("SELECT * FROM lecons WHERE cours_id = :cours ORDER BY ordre ASC");
+    $stmtL->execute([':cours' => $coursId]);
+    $lecons = $stmtL->fetchAll(PDO::FETCH_ASSOC);
 
-// ===============================
-// COURS SELECT
-// ===============================
-$currentCours = null;
+    $leconsData = [];
 
-if ($cours_id > 0) {
+    foreach ($lecons as $l) {
+        $leconId = (int)$l['id'];
+        
+        // Récupérer les contenus de la leçon
+        $stmtC = $pdo->prepare("SELECT * FROM lecon_contenus WHERE lecon_id = :lecon ORDER BY ordre ASC");
+        $stmtC->execute([':lecon' => $leconId]);
+        $links = $stmtC->fetchAll(PDO::FETCH_ASSOC);
 
-    $sql = "
-    SELECT
-        crs.*,
+        $contenus = [];
 
-        c.classe,
-        c.description AS classe_desc,
+        foreach ($links as $link) {
+            $type = $link['type_contenu'];
+            $cid  = (int)$link['contenu_id'];
 
-        n.description AS niveau,
-        s.description AS section,
-        o.description AS opt
-
-    FROM cours crs
-
-    INNER JOIN classes c
-    ON c.id = crs.class
-
-    LEFT JOIN niveau n
-    ON n.id = c.niveau
-
-    LEFT JOIN section s
-    ON s.id = c.section
-
-    LEFT JOIN options o
-    ON o.id = c.options
-
-    WHERE crs.id = :id
-    LIMIT 1
-    ";
-
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ':id' => $cours_id
-    ]);
-
-    $currentCours = $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-// ===============================
-// LECONS
-// ===============================
-$lecons = [];
-
-if ($cours_id > 0) {
-
-    $sql = "
-    SELECT *
-    FROM lecons
-    WHERE cours_id = :cours
-    ORDER BY ordre ASC
-    ";
-
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ':cours' => $cours_id
-    ]);
-
-    $lecons = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
-// ===============================
-// CONTENUS
-// ===============================
-$contenus = [];
-
-if ($lecon_id > 0) {
-
-    $sql = "
-    SELECT *
-    FROM lecon_contenus
-    WHERE lecon_id = :lecon
-    ORDER BY ordre ASC
-    ";
-
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ':lecon' => $lecon_id
-    ]);
-
-    $links = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    foreach ($links as $link) {
-
-        $type = $link['type_contenu'];
-        $cid  = (int)$link['contenu_id'];
-
-        $row = null;
-
-        // PDF
-        if ($type === 'pdf') {
-
-            $s = $pdo->prepare("
-                SELECT id, title, description
-                FROM pdfs
-                WHERE id = :id
-            ");
-
-            $s->execute([':id' => $cid]);
-
-            $row = $s->fetch(PDO::FETCH_ASSOC);
-
-            if ($row) {
-
-                $contenus[] = [
-                    'type'  => 'PDF',
-                    'icon'  => 'fa-file-pdf text-danger',
-                    'title' => $row['title'],
-                    'desc'  => $row['description'],
-                    'url'   => '../view_pdf.php?id=' . $cid
-                ];
+            if ($type === 'pdf') {
+                $s = $pdo->prepare("SELECT id, title, description FROM pdfs WHERE id = :id");
+                $s->execute([':id' => $cid]);
+                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
+                    $contenus[] = [
+                        'type' => 'PDF', 'icon' => 'fa-file-pdf text-danger',
+                        'title' => $row['title'], 'desc' => $row['description'],
+                        'url' => '../view_pdf.php?id=' . $cid
+                    ];
+                }
+            } elseif ($type === 'video') {
+                $s = $pdo->prepare("SELECT id, title, description FROM videos WHERE id = :id");
+                $s->execute([':id' => $cid]);
+                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
+                    $contenus[] = [
+                        'type' => 'VIDEO', 'icon' => 'fa-video text-primary',
+                        'title' => $row['title'], 'desc' => $row['description'],
+                        'url' => '../view_video.php?id=' . $cid
+                    ];
+                }
+            } elseif ($type === 'audio') {
+                $s = $pdo->prepare("SELECT id, titre, description FROM audios WHERE id = :id");
+                $s->execute([':id' => $cid]);
+                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
+                    $contenus[] = [
+                        'type' => 'AUDIO', 'icon' => 'fa-headphones text-success',
+                        'title' => $row['titre'], 'desc' => $row['description'],
+                        'url' => '../view_audio.php?id=' . $cid
+                    ];
+                }
+            } elseif ($type === 'image') {
+                $s = $pdo->prepare("SELECT id, title, description FROM images WHERE id = :id");
+                $s->execute([':id' => $cid]);
+                if ($row = $s->fetch(PDO::FETCH_ASSOC)) {
+                    $contenus[] = [
+                        'type' => 'IMAGE', 'icon' => 'fa-image text-warning',
+                        'title' => $row['title'], 'desc' => $row['description'],
+                        'url' => '../view_image.php?id=' . $cid
+                    ];
+                }
             }
         }
 
-        // VIDEO
-        if ($type === 'video') {
-
-            $s = $pdo->prepare("
-                SELECT id, title, description
-                FROM videos
-                WHERE id = :id
-            ");
-
-            $s->execute([':id' => $cid]);
-
-            $row = $s->fetch(PDO::FETCH_ASSOC);
-
-            if ($row) {
-
-                $contenus[] = [
-                    'type'  => 'VIDEO',
-                    'icon'  => 'fa-video text-primary',
-                    'title' => $row['title'],
-                    'desc'  => $row['description'],
-                    'url'   => '../view_video.php?id=' . $cid
-                ];
-            }
-        }
-
-        // AUDIO
-        if ($type === 'audio') {
-
-            $s = $pdo->prepare("
-                SELECT id, titre, description
-                FROM audios
-                WHERE id = :id
-            ");
-
-            $s->execute([':id' => $cid]);
-
-            $row = $s->fetch(PDO::FETCH_ASSOC);
-
-            if ($row) {
-
-                $contenus[] = [
-                    'type'  => 'AUDIO',
-                    'icon'  => 'fa-headphones text-success',
-                    'title' => $row['titre'],
-                    'desc'  => $row['description'],
-                    'url'   => '../view_audio.php?id=' . $cid
-                ];
-            }
-        }
-
-        // IMAGE
-        if ($type === 'image') {
-
-            $s = $pdo->prepare("
-                SELECT id, title, description
-                FROM images
-                WHERE id = :id
-            ");
-
-            $s->execute([':id' => $cid]);
-
-            $row = $s->fetch(PDO::FETCH_ASSOC);
-
-            if ($row) {
-
-                $contenus[] = [
-                    'type'  => 'IMAGE',
-                    'icon'  => 'fa-image text-warning',
-                    'title' => $row['title'],
-                    'desc'  => $row['description'],
-                    'url'   => '../view_image.php?id=' . $cid
-                ];
-            }
-        }
+        $l['contenus'] = $contenus;
+        $leconsData[] = $l;
     }
+
+    $c['lecons'] = $leconsData;
+    $fullData[] = $c;
 }
 ?>
 
@@ -407,11 +231,8 @@ if ($lecon_id > 0) {
 <html lang="fr">
 
 <head>
-
     <meta charset="utf-8">
-
     <title>Nos cours | MyKelasi</title>
-
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link rel="shortcut icon" type="image/x-icon" href="../img/favicon.png">
@@ -425,40 +246,107 @@ if ($lecon_id > 0) {
     <link rel="stylesheet" href="../style.css">
 
     <script src="../js/modernizr-3.6.0.min.js"></script>
-    <script src="../js/Chart.min.js"></script>
 
     <style>
-    .card-box {
-        border-radius: 18px;
-        border: 0;
-        box-shadow: 0 5px 25px rgba(0, 0, 0, .05);
+    /* Tailles de texte augmentées & Adaptations UI */
+    body {
+        font-size: 1.05rem;
+        /* Augmentation globale */
     }
 
-    .course-item {
-        transition: .2s;
+    .accordion-course .card {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        margin-bottom: 18px;
+        overflow: hidden;
     }
 
-    .course-item:hover {
-        background: #f8f9fa;
+    .accordion-course .card-header {
+        background-color: #ffffff;
+        border-bottom: 1px solid #eef2f5;
+        padding: 18px 24px;
     }
 
-    .lesson-card {
-        border-left: 4px solid #007bff;
+    .btn-accordion-toggle {
+        width: 100%;
+        text-align: left;
+        padding: 0;
+        color: #1e293b;
+        font-weight: 700;
+        text-decoration: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }
 
-    .content-card {
-        transition: .2s;
+    .btn-accordion-toggle:focus {
+        box-shadow: none;
     }
 
-    .content-card:hover {
+    .course-title {
+        font-size: 1.25rem;
+        /* Augmentation titre cours */
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .lesson-item {
+        background: #ffffff;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        margin-bottom: 12px;
+        overflow: hidden;
+    }
+
+    .lesson-header {
+        padding: 15px 20px;
+        font-size: 1.1rem;
+        /* Augmentation titre leçon */
+        font-weight: 600;
+        background: #f8fafc;
+    }
+
+    .content-box {
+        background: #ffffff;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        padding: 16px;
+        transition: transform 0.2s;
+    }
+
+    .content-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .content-box:hover {
         transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.06);
     }
 
-    .action-btns .btn {
-        margin-left: 5px;
+    .badge-soft {
+        background-color: #f1f5f9;
+        color: #334155;
+        font-weight: 600;
+        font-size: 0.9rem;
+        /* Badge agrandi */
+        padding: 6px 12px;
+    }
+
+    .search-input-group .form-control {
+        border-radius: 10px 0 0 10px;
+        font-size: 1.1rem;
+        padding: 12px 20px;
+    }
+
+    .search-input-group .input-group-text {
+        border-radius: 0 10px 10px 0;
+        background-color: #0d6efd;
+        color: #ffffff;
+        padding: 12px 20px;
     }
     </style>
-
 </head>
 
 <body>
@@ -477,255 +365,195 @@ if ($lecon_id > 0) {
 
                     <!-- HEADER -->
                     <div class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
-
                         <div>
-                            <h3 class="mb-1 fw-bold">
-                                <i class="fas fa-book text-primary me-2"></i>
-                                Nos cours
-                            </h3>
-
+                            <h2 class="mb-1 fw-bold text-dark">
+                                <i class="fas fa-layer-group text-primary me-2"></i>
+                                Programme des cours
+                            </h2>
                             <p class="text-muted mb-0">
-                                Gestion des cours, leçons et contenus pédagogiques
+                                Consulez et gérez vos cours, leçons et supports pédagogiques
                             </p>
                         </div>
 
-                        <a href="add-edit-cours.php" class="btn btn-primary btn-md px-4">
+                        <a href="add-edit-cours.php" class="btn btn-primary btn-lg px-4 shadow-sm">
                             <i class="fas fa-plus-circle me-2"></i>
                             Nouveau cours
                         </a>
                     </div>
 
                     <?php if(isset($_GET['success'])): ?>
-
-                    <div class="alert alert-success">
+                    <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4 fs-6"
+                        role="alert">
+                        <i class="fas fa-check-circle me-2"></i>
                         Suppression effectuée avec succès.
                     </div>
-
                     <?php endif; ?>
 
-                    <div class="row">
+                    <!-- INPUT DE RECHERCHE DYNAMIQUE -->
+                    <div class="row mb-4">
+                        <div class="col-md-8 col-lg-6">
+                            <div class="input-group search-input-group">
+                                <input type="text" id="searchCoursInput" class="form-control"
+                                    placeholder="Rechercher un cours, une classe ou un prof..." onkeyup="filterCours()">
+                                <!-- <span class="input-group-text">
+                                    <i class="fas fa-search fa-lg"></i>
+                                </span> -->
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- COURS -->
-                        <div class="col-lg-4 mb-4">
+                    <!-- ACCORDION COURS -->
+                    <div class="accordion accordion-course" id="accordionCours">
 
-                            <div class="card card-box">
+                        <?php if(empty($fullData)): ?>
+                        <div class="card p-5 text-center text-muted">
+                            <i class="fas fa-folder-open fa-4x mb-3"></i>
+                            <h4>Aucun cours disponible</h4>
+                        </div>
+                        <?php else: ?>
 
-                                <div class="card-body">
+                        <?php foreach($fullData as $index => $c): ?>
 
-                                    <h5 class="mb-4">
-                                        <i class="fas fa-layer-group"></i>
-                                        Liste des cours
-                                    </h5>
+                        <div class="card course-card-item"
+                            data-search="<?= e(strtolower($c['nom'] . ' ' . classeLabel($c) . ' ' . $c['first_name'] . ' ' . $c['last_name'])) ?>">
 
-                                    <?php if(!$cours): ?>
+                            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
+                                id="headingCours<?= $c['id'] ?>">
 
-                                    <div class="alert alert-info">
-                                        Aucun cours trouvé.
-                                    </div>
+                                <button class="btn btn-accordion-toggle flex-grow-1 collapsed" type="button"
+                                    data-toggle="collapse" data-target="#collapseCours<?= $c['id'] ?>"
+                                    aria-expanded="false" aria-controls="collapseCours<?= $c['id'] ?>">
 
-                                    <?php else: ?>
-
-                                    <div class="list-group">
-
-                                        <?php foreach($cours as $c): ?>
-
-                                        <div class="list-group-item <?= ($cours_id == $c['id']) ? 'active':'' ?>">
-
-                                            <div class="d-flex justify-content-between align-items-start">
-
-                                                <div>
-
-                                                    <div class="font-weight-bold">
-                                                        <?= e($c['nom']) ?>
-                                                    </div>
-
-                                                    <small>
-                                                        <?= e(classeLabel($c)) ?>
-                                                    </small>
-
-                                                    <br>
-
-                                                    <small>
-                                                        Prof :
-                                                        <?= e($c['first_name'] . ' ' . $c['last_name']) ?>
-                                                    </small>
-                                                </div>
-
-                                            </div>
-                                            <div class="action-btns">
-
-                                                <!-- EDIT -->
-                                                <a href="add-edit-cours.php?id=<?= (int)$c['id'] ?>"
-                                                    class="btn btn-sm btn-secondary text-white">
-
-                                                    <i class="fas fa-edit"></i>
-
-                                                </a>
-
-                                                <!-- DELETE -->
-                                                <a href="?delete_cours=<?= (int)$c['id'] ?>"
-                                                    class="btn btn-sm btn-danger"
-                                                    onclick="return confirm('Supprimer ce cours, ses leçons et quiz ?')">
-
-                                                    <i class="fas fa-trash"></i>
-
-                                                </a>
-
-                                                <!-- OPEN -->
-                                                <a href="?cours_id=<?= (int)$c['id'] ?>" class="btn btn-sm btn-primary">
-                                                    <i class="fas fa-folder-open"></i>
-                                                </a>
-
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="fas fa-book text-primary fa-2x me-2"></i>
+                                        <div>
+                                            <div class="course-title"><?= e($c['nom']) ?></div>
+                                            <div class="mt-1">
+                                                <span class="badge badge-soft me-2">
+                                                    <i class="fas fa-graduation-cap me-1"></i><?= e(classeLabel($c)) ?>
+                                                </span>
+                                                <small class="text-muted fs-6">
+                                                    <i class="fas fa-user-tie me-1"></i>Prof :
+                                                    <strong><?= e($c['first_name'] . ' ' . $c['last_name']) ?></strong>
+                                                </small>
                                             </div>
                                         </div>
-
-                                        <?php endforeach; ?>
-
                                     </div>
 
-                                    <?php endif; ?>
+                                    <i class="fas fa-chevron-down text-muted fa-lg"></i>
 
+                                </button>
+
+                                <div class="action-btns d-flex gap-2 ms-3">
+                                    <!-- EDIT -->
+                                    <a href="add-edit-cours.php?id=<?= (int)$c['id'] ?>"
+                                        class="btn btn-md btn-light border" title="Modifier">
+                                        <i class="fas fa-pen text-secondary fa-lg"></i>
+                                    </a>
+
+                                    <!-- DELETE -->
+                                    <a href="?delete_cours=<?= (int)$c['id'] ?>" class="btn btn-md btn-light border"
+                                        title="Supprimer"
+                                        onclick="return confirm('Supprimer ce cours, ses leçons et quiz ?')">
+                                        <i class="fas fa-trash-alt text-danger fa-lg"></i>
+                                    </a>
                                 </div>
 
                             </div>
 
-                        </div>
+                            <!-- LEÇONS DU COURS -->
+                            <div id="collapseCours<?= $c['id'] ?>" class="collapse"
+                                aria-labelledby="headingCours<?= $c['id'] ?>" data-parent="#accordionCours">
 
-                        <!-- LECONS -->
-                        <div class="col-lg-4 mb-4">
+                                <div class="card-body bg-light p-4">
 
-                            <div class="card card-box">
+                                    <?php if(empty($c['lecons'])): ?>
 
-                                <div class="card-body">
-
-                                    <h5 class="mb-4">
-                                        <i class="fas fa-list"></i>
-                                        Leçons
-                                    </h5>
-
-                                    <?php if(!$currentCours): ?>
-
-                                    <div class="alert alert-light">
-                                        Sélectionnez un cours.
-                                    </div>
-
-                                    <?php elseif(!$lecons): ?>
-
-                                    <div class="alert alert-warning">
-                                        Aucune leçon trouvée.
+                                    <div class="alert alert-warning border-0 mb-0 fs-6">
+                                        <i class="fas fa-exclamation-circle me-1"></i> Aucune leçon enregistrée dans ce
+                                        cours.
                                     </div>
 
                                     <?php else: ?>
 
-                                    <?php foreach($lecons as $l): ?>
+                                    <h5 class="fw-bold mb-3 text-secondary">
+                                        <i class="fas fa-stream me-2"></i>Leçons du cours :
+                                    </h5>
 
-                                    <div class="card lesson-card mb-3">
+                                    <!-- ACCORDION INTERNE LEÇONS -->
+                                    <div class="accordion" id="accordionLecons<?= $c['id'] ?>">
 
-                                        <div class="card-body">
+                                        <?php foreach($c['lecons'] as $l): ?>
 
-                                            <div class="d-flex justify-content-between align-items-center">
+                                        <div class="lesson-item">
 
-                                                <div>
+                                            <div class="lesson-header d-flex justify-content-between align-items-center"
+                                                data-toggle="collapse" data-target="#collapseLecon<?= $l['id'] ?>"
+                                                style="cursor: pointer;">
 
-                                                    <h6 class="mb-1">
-                                                        <?= e($l['titre']) ?>
-                                                    </h6>
-
-                                                    <small class="text-muted">
-                                                        Ordre : <?= (int)$l['ordre'] ?>
-                                                    </small>
-
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge badge-primary me-3 fs-6">N°
+                                                        <?= (int)$l['ordre'] ?></span>
+                                                    <span class="text-dark fw-bold"><?= e($l['titre']) ?></span>
                                                 </div>
 
-                                                <a href="?cours_id=<?= $cours_id ?>&lecon_id=<?= (int)$l['id'] ?>"
-                                                    class="btn btn-primary btn-sm">
-
-                                                    Voir
-
-                                                </a>
+                                                <div class="text-primary fw-bold fs-6">
+                                                    <?= count($l['contenus']) ?> contenu(s) <i
+                                                        class="fas fa-chevron-down ms-1"></i>
+                                                </div>
 
                                             </div>
 
-                                        </div>
+                                            <!-- CONTENUS DE LA LEÇON -->
+                                            <div class="collapse p-3 border-top" id="collapseLecon<?= $l['id'] ?>"
+                                                data-parent="#accordionLecons<?= $c['id'] ?>">
 
-                                    </div>
+                                                <?php if(empty($l['contenus'])): ?>
 
-                                    <?php endforeach; ?>
+                                                <div class="alert alert-info border-0 mb-0 fs-6">
+                                                    <i class="fas fa-info-circle me-1"></i> Aucun contenu multimédia
+                                                    (PDF, Vidéo, Audio...) dans cette leçon.
+                                                </div>
 
-                                    <?php endif; ?>
+                                                <?php else: ?>
 
-                                </div>
+                                                <div class="row">
 
-                            </div>
+                                                    <?php foreach($l['contenus'] as $cnt): ?>
 
-                        </div>
+                                                    <div class="col-md-6 col-lg-4 mb-3">
 
-                        <!-- CONTENUS -->
-                        <div class="col-lg-4 mb-4">
+                                                        <div class="content-box">
 
-                            <div class="card card-box">
+                                                            <div class="d-flex align-items-center gap-3 mb-2">
+                                                                <i class="fas <?= e($cnt['icon']) ?> fa-2x me-2"></i>
+                                                                <div>
+                                                                    <div class="content-title text-dark">
+                                                                        <?= e($cnt['title']) ?></div>
+                                                                    <span
+                                                                        class="badge badge-soft mt-1"><?= e($cnt['type']) ?></span>
+                                                                </div>
+                                                            </div>
 
-                                <div class="card-body">
-
-                                    <h5 class="mb-4">
-                                        <i class="fas fa-folder-open"></i>
-                                        Contenus
-                                    </h5>
-
-                                    <?php if(!$lecon_id): ?>
-
-                                    <div class="alert alert-light">
-                                        Sélectionnez une leçon.
-                                    </div>
-
-                                    <?php elseif(!$contenus): ?>
-
-                                    <div class="alert alert-warning">
-                                        Aucun contenu disponible.
-                                    </div>
-
-                                    <?php else: ?>
-
-                                    <div class="row">
-
-                                        <?php foreach($contenus as $c): ?>
-
-                                        <div class="col-12 mb-3">
-
-                                            <div class="card content-card">
-
-                                                <div class="card-body">
-
-                                                    <div class="d-flex">
-
-                                                        <div class="mr-3">
-
-                                                            <i class="fas <?= e($c['icon']) ?> fa-2x"></i>
-
-                                                        </div>
-
-                                                        <div class="flex-fill">
-
-                                                            <h6 class="mb-1">
-                                                                <?= e($c['title']) ?>
-                                                            </h6>
-
-                                                            <p class="text-muted small mb-2">
-                                                                <?= e($c['desc']) ?>
+                                                            <p class="text-muted fs-6 mb-3 text-truncate">
+                                                                <?= e($cnt['desc']) ?>
                                                             </p>
 
-                                                            <a href="<?= e($c['url']) ?>" target="_blank"
-                                                                class="btn btn-outline-primary btn-sm">
-
-                                                                Ouvrir
-
+                                                            <a href="<?= e($cnt['url']) ?>" target="_blank"
+                                                                class="btn btn-md btn-outline-primary w-100 fw-bold">
+                                                                <i class="fas fa-external-link-alt me-1"></i> Ouvrir le
+                                                                document
                                                             </a>
 
                                                         </div>
 
                                                     </div>
 
+                                                    <?php endforeach; ?>
+
                                                 </div>
+
+                                                <?php endif; ?>
 
                                             </div>
 
@@ -742,6 +570,10 @@ if ($lecon_id > 0) {
                             </div>
 
                         </div>
+
+                        <?php endforeach; ?>
+
+                        <?php endif; ?>
 
                     </div>
 
@@ -766,6 +598,24 @@ if ($lecon_id > 0) {
     <script src="../js/fullcalendar.min.js"></script>
     <script src="../js/Chart.min.js"></script>
     <script src="../js/main.js"></script>
+
+    <!-- SCRIPT FILTRE DE RECHERCHE JS -->
+    <script>
+    function filterCours() {
+        const input = document.getElementById('searchCoursInput');
+        const filter = input.value.toLowerCase().trim();
+        const cards = document.querySelectorAll('.course-card-item');
+
+        cards.forEach(card => {
+            const searchData = card.getAttribute('data-search');
+            if (searchData.includes(filter)) {
+                card.style.display = "";
+            } else {
+                card.style.display = "none";
+            }
+        });
+    }
+    </script>
 
 </body>
 

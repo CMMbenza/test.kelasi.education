@@ -178,10 +178,10 @@ $formAction = 'service/add-student.php';
                                     <input type="text" placeholder="dd/mm/yyyy" class="form-control air-datepicker"
                                         name="date_of_birth" data-position='bottom right' value="<?= h($dobVal) ?>"
                                         required>
-                                    <i class="far fa-calendar-alt"></i>
+                                    <!-- <i class="far fa-calendar-alt"></i> -->
                                 </div>
                                 <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                    <label>E-Mail</label>
+                                    <label>Adresse e-mail (élève)</label>
                                     <input type="email" name="email" class="form-control" value="<?= $val('email') ?>">
                                 </div>
                                 <div class="col-xl-3 col-lg-6 col-12 form-group">
@@ -190,14 +190,14 @@ $formAction = 'service/add-student.php';
                                 </div>
                                 <div class="col-xl-3 col-lg-6 col-12 form-group"></div>
 
-                                <div class="col-lg-6 col-12 form-group mg-t-30">
+                                <!-- <div class="col-lg-6 col-12 form-group mg-t-30">
                                     <label class="text-dark-medium">Téléverser photo élève <?= h($photoHelp) ?></label>
                                     <input type="file" name="photo" class="form-control-file">
                                 </div>
                                 <div class="col-lg-6 col-12 form-group mg-t-30">
                                     <label class="text-dark-medium">Téléverser les documents de l'élève</label>
                                     <input type="file" name="document" class="form-control-file">
-                                </div>
+                                </div> -->
 
                                 <div class="col-xl-3 col-lg-6 col-12 form-group mt-3">
                                     <label>Ecole provenance *</label>
@@ -206,7 +206,8 @@ $formAction = 'service/add-student.php';
                                 </div>
 
                                 <div class="col-lg-12 col-12 form-group mg-t-30">
-                                    <h3 class="text-dark-medium" style="text-transform: uppercase;">info du responsable
+                                    <h3 class="text-dark-medium" style="text-transform: uppercase; font-size: 16px;">
+                                        info du responsable
                                     </h3>
                                     <hr>
                                 </div>
@@ -226,13 +227,14 @@ $formAction = 'service/add-student.php';
                                         value="<?= $val('phone_responsable') ?>" required>
                                 </div>
                                 <div class="col-xl-3 col-lg-6 col-12 form-group">
-                                    <label>Email *</label>
+                                    <label>Adresse e-mail *</label>
                                     <input type="email" name="email_responsable" class="form-control"
                                         value="<?= $val('email_responsable') ?>" required>
                                 </div>
 
                                 <div class="col-lg-12 col-12 form-group mg-t-30">
-                                    <h3 class="text-dark-medium" style="text-transform: uppercase;">Affectation</h3>
+                                    <h3 class="text-dark-medium" style="text-transform: uppercase; font-size: 16px;">
+                                        Affectation & CONNEXION DE L'ELEVE</h3>
                                     <hr>
                                 </div>
                                 <div class="col-xl-3 col-lg-6 col-12 form-group">

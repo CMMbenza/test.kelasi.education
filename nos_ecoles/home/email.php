@@ -25,14 +25,24 @@ if (!function_exists('kelasi_login_url')) {
 if (!function_exists('mail_html')) {
     function mail_html(string $to, string $subject, string $html): bool {
 
-        $from     = $GLOBALS['MAIL_FROM'];
-        $fromName = $GLOBALS['MAIL_FROM_NAME'];
-        $replyTo  = $GLOBALS['MAIL_REPLY_TO'];
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        $from     = $GLOBALS['MAIL_FROM'] ?? 'no-reply@kelasi.education';
+        $fromName = $GLOBALS['MAIL_FROM_NAME'] ?? 'Kelasi';
+        $replyTo  = $GLOBALS['MAIL_REPLY_TO'] ?? 'contact@kelasi.education';
+
+        $domain   = parse_url('http://' . ($_SERVER['HTTP_HOST'] ?? 'kelasi.education'), PHP_URL_HOST);
+        $msgId    = '<' . time() . '.' . bin2hex(random_bytes(4)) . '@' . $domain . '>';
 
         $headers  = "MIME-Version: 1.0\r\n";
         $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+        $headers .= "Content-Transfer-Encoding: 8bit\r\n";
         $headers .= 'From: =?UTF-8?B?'.base64_encode($fromName)."?= <{$from}>\r\n";
         $headers .= "Reply-To: {$replyTo}\r\n";
+        $headers .= "Date: " . date(DATE_RFC2822) . "\r\n";
+        $headers .= "Message-ID: {$msgId}\r\n";
         $headers .= "X-Mailer: PHP/".phpversion()."\r\n";
 
         return @mail(
@@ -65,7 +75,7 @@ if (!function_exists('send_student_credentials')) {
         $ecole = htmlspecialchars($data['ecole_name'] ?? '', ENT_QUOTES, 'UTF-8');
 
         $html = "
-        <div style='font-family:Arial;padding:15px;color:#333'>
+        <div style='font-family:Arial,sans-serif;padding:15px;color:#333;line-height:1.5;'>
             <h2>Bienvenue {$first} {$last}</h2>
 
             <p>Votre compte élève a été créé sur <strong>{$ecole}</strong>.</p>
@@ -98,18 +108,25 @@ if (!function_exists('send_student_credentials')) {
 if (!function_exists('notify_admins_new_student')) {
     function notify_admins_new_student(PDO $pdo, string $code_ecole, array $data): int {
 
-        $subject = "Nouvelle inscription élève - ".$data['ecole_name'];
+        $subject = "Nouvelle inscription élève - ".($data['ecole_name'] ?? '');
+
+        $first      = htmlspecialchars($data['first'] ?? '', ENT_QUOTES, 'UTF-8');
+        $last       = htmlspecialchars($data['last'] ?? '', ENT_QUOTES, 'UTF-8');
+        $email      = htmlspecialchars($data['email'] ?? '', ENT_QUOTES, 'UTF-8');
+        $phone      = htmlspecialchars($data['phone'] ?? '', ENT_QUOTES, 'UTF-8');
+        $class_id   = htmlspecialchars((string)($data['class_id'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $ecole_name = htmlspecialchars($data['ecole_name'] ?? '', ENT_QUOTES, 'UTF-8');
 
         $html = "
-        <div style='font-family:Arial'>
+        <div style='font-family:Arial,sans-serif;'>
             <h3>Nouvelle inscription</h3>
-            <p>École : <b>{$data['ecole_name']}</b></p>
+            <p>École : <b>{$ecole_name}</b></p>
 
             <ul>
-                <li>Élève : {$data['first']} {$data['last']}</li>
-                <li>Email : {$data['email']}</li>
-                <li>Téléphone : {$data['phone']}</li>
-                <li>Classe ID : {$data['class_id']}</li>
+                <li>Élève : {$first} {$last}</li>
+                <li>Email : {$email}</li>
+                <li>Téléphone : {$phone}</li>
+                <li>Classe ID : {$class_id}</li>
             </ul>
         </div>";
 
@@ -127,10 +144,10 @@ if (!function_exists('notify_admins_new_student')) {
         $count = 0;
 
         foreach ($admins as $a) {
-            $email = trim($a['email']);
+            $emailAdmin = trim($a['email'] ?? '');
 
-            if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                if (mail_html($email, $subject, $html)) {
+            if ($emailAdmin && filter_var($emailAdmin, FILTER_VALIDATE_EMAIL)) {
+                if (mail_html($emailAdmin, $subject, $html)) {
                     $count++;
                 }
             }

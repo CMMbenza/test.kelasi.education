@@ -97,6 +97,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         'code_ecole' => $u['code_ecole'] ?? null,
                     ];
 
+                    // 🟢 [CORRECTION 1] Charger directement les infos de l'école pour la NAVBAR
+                    if (!empty($u['code_ecole'])) {
+                        try {
+                            $stEcole = $pdo->prepare("
+                                SELECT nom_ecole, url_ecole, nom_responsable, postnom_responsable 
+                                FROM ecoles 
+                                WHERE code_ecole = :ce 
+                                LIMIT 1
+                            ");
+                            $stEcole->execute([':ce' => $u['code_ecole']]);
+                            if ($ecole = $stEcole->fetch(PDO::FETCH_ASSOC)) {
+                                $_SESSION['nom_ecole']           = $ecole['nom_ecole'] ?? '';
+                                $_SESSION['url_ecole']           = $ecole['url_ecole'] ?? '';
+                                $_SESSION['nom_responsable']     = $ecole['nom_responsable'] ?? '';
+                                $_SESSION['postnom_responsable'] = $ecole['postnom_responsable'] ?? '';
+                            }
+                        } catch (Throwable $e) {}
+                    }
+
                     // If legacy password, force change
                     if ($is_legacy) {
                         $_SESSION['force_password_change'] = true;
@@ -104,28 +123,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         exit;
                     }
 
-                    /* 🟡🔗 Correction ajoutée — Lier Users → Students */
+                    // 🟢 [CORRECTION 2] Lier Users → Students & mettre à jour id_user
                     if ($_SESSION['role'] === 'eleve') {
                         try {
                             $st2 = $pdo->prepare("
                                 SELECT id, class_id
                                 FROM students
-                                WHERE username = :un
-                                  AND code_ecole = :ce
+                                WHERE (username = :un OR email = :em)
+                                  " . (!empty($_SESSION['code_ecole']) ? "AND code_ecole = :ce" : "") . "
                                 LIMIT 1
                             ");
-                            $st2->execute([
-                                ':un' => $_SESSION['username'],
-                                ':ce' => $_SESSION['code_ecole']
-                            ]);
+                            $params = [':un' => $_SESSION['username'], ':em' => $_SESSION['email']];
+                            if (!empty($_SESSION['code_ecole'])) $params[':ce'] = $_SESSION['code_ecole'];
+                            
+                            $st2->execute($params);
 
                             if ($stu = $st2->fetch(PDO::FETCH_ASSOC)) {
                                 $_SESSION['student_id'] = (int)$stu['id'];
                                 $_SESSION['class_id']   = (int)($stu['class_id'] ?? 0);
+
+                                // Mettre à jour la colonne id_user dans students
+                                $stUp = $pdo->prepare("UPDATE students SET id_user = :uid WHERE id = :sid");
+                                $stUp->execute([':uid' => (int)$u['id'], ':sid' => (int)$stu['id']]);
                             }
                         } catch(Throwable $e){}
                     }
-                    /* 🔚 FIN correction */
 
                     // Redirection
                     $r = $_SESSION['role'];
@@ -151,6 +173,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 }
 ?>
+
 <!doctype html>
 <html class="no-js" lang="fr">
 

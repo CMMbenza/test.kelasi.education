@@ -142,7 +142,7 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
                     <div class="item-content">
                         <ul class="settings-list">
                             <li><a href="profil.php"><i class="flaticon-user"></i>Mon profil</a></li>
-                            <!--<li><a href="account-settings.php"><i class="flaticon-gear-loading"></i>Paramètres</a></li>-->
+                            <li><a href="settings.php"><i class="flaticon-gear-loading"></i>Paramètres</a></li>
                             <li><a href="../login/logout.php?msg=logout"><i
                                         class="flaticon-turn-off"></i>Déconnexion</a></li>
                         </ul>

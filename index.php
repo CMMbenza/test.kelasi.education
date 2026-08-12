@@ -437,7 +437,7 @@ $total_profs = $stmt->fetchColumn();
                         <div class="card card-premium text-center p-4 w-100 mx-2" style="max-width:300px;">
 
                             <!-- Logo école -->
-                            <img src="<?= htmlspecialchars($ecole['logo'] ?: 'https://png.pngtree.com/png-clipart/20230623/original/pngtree-school-logo-design-template-vector-png-image_9204124.png') ?>"
+                            <img src="uploads/logo/<?= htmlspecialchars($ecole['logo'] ?: 'img/kelasi.png') ?>"
                                 alt="Logo <?= htmlspecialchars($ecole['nom_ecole']) ?>"
                                 class="mb-3 rounded-circle mx-auto" style="width:80px;height:80px;object-fit:cover;">
 
