@@ -46,8 +46,10 @@ $sql = "
         montant_a_payer,
         montant_paye,
         solde,
+        mode,
         date_paiement,
-        code_ecole
+        code_ecole,
+        is_validated
     )
     VALUES
     (
@@ -57,8 +59,10 @@ $sql = "
         :montant_a_payer,
         :montant_paye,
         :solde,
+        'Paiement en présentiel',
         NOW(),
-        :code_ecole
+        :code_ecole,
+        1
     )
 ";
 

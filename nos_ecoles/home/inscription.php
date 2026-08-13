@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/paserelle_url.php';             // init session + $url_session_ecole
 require __DIR__ . '/../../database/db_connect.php'; // $pdo
-require __DIR__ . '/email.php';                      // fonctions d'email
+require_once 'email.php';              // fonctions d'email
 
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 if (!($pdo instanceof PDO)) { http_response_code(500); exit('DB indisponible'); }
@@ -161,43 +161,65 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         }
 
         // ───────── Transaction : insert students + insert users ─────────
+        // ───────── Transaction : insert users + insert students ─────────
         $pdo->beginTransaction();
 
-        // 1) STUDENTS
-        $sqlS = "INSERT INTO students
-                 (first_name,last_name,username,gender,date_of_birth,email,phone,class_id,PASSWORD,father,mother,phone_responsable,email_responsable,created_at,code_ecole,ecole_provenance,statut)
-                 VALUES
-                 (:fn,:ln,:un,:g,:dob,:em,:ph,:cid,:pwd,:fa,:mo,:ph_r,:em_r,NOW(),:ec,:prov,'invalide')";
-        $stS = $pdo->prepare($sqlS);
-        $stS->execute([
-            ':fn'=>$first_name, ':ln'=>$last_name, ':un'=>$username, ':g'=>$gender,
-            ':dob'=>$date_of_birth, ':em'=>$email!==''?$email:null, ':ph'=>$phone!==''?$phone:null,
-            ':cid'=>$class_id!==null?$class_id:null, ':pwd'=>$passwordHash,
-            ':fa'=>$father, ':mo'=>$mother, ':ph_r'=>$phone_resp, ':em_r'=>$email_resp,
-            ':ec'=>$code_ecole, ':prov'=>$ecole_provenance ?: $handle_ecole
-        ]);
-        $studentId = (int)$pdo->lastInsertId();
+        // Email pour USERS (placeholder temporaire si vide)
+        // On utilisera plus tard le premier LAST_INSERT_ID si nécessaire, 
+        // mais une chaîne unique basée sur le temps convient parfaitement.
+        $tempEmailPlaceholder = 'student_' . time() . '_' . bin2hex(random_bytes(3)) . '@noemail.local';
+        $userEmail = $email !== '' ? $email : $tempEmailPlaceholder;
 
-        // Email pour USERS (placeholder si vide)
-        $userEmail = $email !== '' ? $email : ('student'.$studentId.'@noemail.local');
-
-        // 2) USERS (role élève)
+        // 1) USERS (role élève)
         $sqlU = "INSERT INTO users
                  (username, PASSWORD, email, role, first_name, last_name, phone, numero_bancaire, code_ecole, created_at, updated_at)
                  VALUES
                  (:un, :pwd, :em, 'eleve', :fn, :ln, :ph, :nb, :ec, NOW(), NOW())";
         $stU = $pdo->prepare($sqlU);
         $stU->execute([
-            ':un'=>$username,
-            ':pwd'=>$passwordHash,
-            ':em'=>$userEmail,
-            ':fn'=>$first_name,
-            ':ln'=>$last_name,
-            ':ph'=>$phone!==''?$phone:'',
-            ':nb'=>'',
-            ':ec'=>$code_ecole
+            ':un'  => $username,
+            ':pwd' => $passwordHash,
+            ':em'  => $userEmail,
+            ':fn'  => $first_name,
+            ':ln'  => $last_name,
+            ':ph'  => $phone !== '' ? $phone : '',
+            ':nb'  => '',
+            ':ec'  => $code_ecole
         ]);
         $userId = (int)$pdo->lastInsertId();
+
+        // Si l'email était vide, mis à jour du placeholder avec l'ID réel de l'utilisateur
+        if ($email === '') {
+            $userEmail = 'student_' . $userId . '@noemail.local';
+            $stUpEmail = $pdo->prepare("UPDATE users SET email = :em WHERE id = :uid");
+            $stUpEmail->execute([':em' => $userEmail, ':uid' => $userId]);
+        }
+
+        // 2) STUDENTS (lié à id_user)
+        $sqlS = "INSERT INTO students
+                 (id_user, first_name, last_name, username, gender, date_of_birth, email, phone, class_id, PASSWORD, father, mother, phone_responsable, email_responsable, created_at, code_ecole, ecole_provenance, statut)
+                 VALUES
+                 (:uid, :fn, :ln, :un, :g, :dob, :em, :ph, :cid, :pwd, :fa, :mo, :ph_r, :em_r, NOW(), :ec, :prov, 'invalide')";
+        $stS = $pdo->prepare($sqlS);
+        $stS->execute([
+            ':uid'  => $userId,
+            ':fn'   => $first_name,
+            ':ln'   => $last_name,
+            ':un'   => $username,
+            ':g'    => $gender,
+            ':dob'  => $date_of_birth,
+            ':em'   => $email !== '' ? $email : null,
+            ':ph'   => $phone !== '' ? $phone : null,
+            ':cid'  => $class_id !== null ? $class_id : null,
+            ':pwd'  => $passwordHash,
+            ':fa'   => $father,
+            ':mo'   => $mother,
+            ':ph_r' => $phone_resp,
+            ':em_r' => $email_resp,
+            ':ec'   => $code_ecole,
+            ':prov' => $ecole_provenance ?: $handle_ecole
+        ]);
+        $studentId = (int)$pdo->lastInsertId();
 
         // ───────── Uploads (après avoir un ID) ─────────
         $photoPath = null; $docsPaths = [];
@@ -234,40 +256,61 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $pdo->commit();
 
         // ───────── Emails (après commit) ─────────
-        $loginUrl = kelasi_login_url();
+        // ───────── Traitement des e-mails (post-enregistrement) ─────────
+$loginUrl = kelasi_login_url();
+$mailSent = false;
 
-        if ($email !== '') {
-            @send_student_credentials($email, [
-                'first'=>$first_name, 'last'=>$last_name,
-                'username'=>$username, 'password'=>$plainPassword,
-                'code_ecole'=>$code_ecole, 'ecole_name'=>$nom_ecole,
-                'login_url'=>$loginUrl
-            ]);
-        }
-
-        @notify_admins_new_student($pdo, $code_ecole, [
-            'first'=>$first_name, 'last'=>$last_name,
-            'email'=>$email, 'phone'=>$phone,
-            'father'=>$father, 'mother'=>$mother,
-            'email_resp'=>$email_resp, 'phone_resp'=>$phone_resp,
-            'class_id'=>$class_id,
-            'username'=>$username, 'password'=>$plainPassword,
-            'ecole_name'=>$nom_ecole, 'code_ecole'=>$code_ecole
-        ]);
-
-        $ok = true;
-        $alert = '<div class="alert alert-success">✅ Inscription enregistrée. Identifiant: <b>'.e($username).'</b> — Mot de passe: <b>'.e($plainPassword).'</b>'
-               . ($email!=='' ? ' — un e-mail a été envoyé à l’élève.' : ' — aucun e-mail élève (adresse manquante).')
-               . ' Les administrateurs ont été notifiés.</div>';
-
-        $_POST = []; // reset form
-
-    } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        $alert = '<div class="alert alert-danger">❌ '.$e->getMessage().'</div>';
-    }
+// 1. Envoi des identifiants à l'élève (si un email est renseigné)
+if ($email !== '') {
+    $mailSent = send_student_credentials($email, [
+        'first'      => $first_name, 
+        'last'       => $last_name,
+        'username'   => $username, 
+        'password'   => $plainPassword,
+        'code_ecole' => $code_ecole, 
+        'ecole_name' => $nom_ecole,
+        'login_url'  => $loginUrl
+    ]);
 }
 
+// 2. Notification aux administrateurs / promoteurs de l'école
+$adminsNotified = notify_admins_new_student($pdo, $code_ecole, [
+    'first'      => $first_name, 
+    'last'       => $last_name,
+    'email'      => $email, 
+    'phone'      => $phone,
+    'father'     => $father, 
+    'mother'     => $mother,
+    'email_resp' => $email_resp, 
+    'phone_resp' => $phone_resp,
+    'class_id'   => $class_id,
+    'username'   => $username, 
+    'password'   => $plainPassword,
+    'ecole_name' => $nom_ecole, 
+    'code_ecole' => $code_ecole
+]);
+
+// 3. Message de confirmation
+$ok = true;
+$mailStatusText = $mailSent 
+    ? '📧 E-mail d’accès envoyé à l’élève.' 
+    : ($email !== '' ? '⚠️ Impossible d’envoyer l’e-mail à l’élève.' : 'ℹ️ Aucun e-mail renseigné pour l’élève.');
+
+$alert = '<div class="alert alert-success">'
+       . '✅ Inscription réussie !<br>'
+       . 'Identifiant : <b>' . e($username) . '</b> — Mot de passe : <b>' . e($plainPassword) . '</b><br>'
+       . $mailStatusText . '<br>'
+       . '📢 Admin(s) notifié(s) : ' . $adminsNotified
+       . '</div>';
+
+$_POST = []; // Réinitialisation du formulaire
+
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    $alert = '<div class="alert alert-danger">❌ ' . e($e->getMessage()) . '</div>';
+}
 // ───────────── Classes (pour le sélecteur) ─────────────
 $classes = [];
 try {
@@ -392,7 +435,7 @@ try {
                                     maxlength="20" pattern="[0-9+\s().-]{6,20}">
                             </div>
 
-                            <div class="col-lg-6 col-12 form-group mg-t-30">
+                            <!-- <div class="col-lg-6 col-12 form-group mg-t-30">
                                 <label class="text-dark-medium">Télécharger la photo de l'élève (150 px x 150 px) —
                                     JPG/PNG/WEBP (max.
                                     <?= $MAX_PHOTO_MB ?> Mo)</label>
@@ -406,7 +449,7 @@ try {
                                     <?= $MAX_DOC_MB ?> Mo chacun)</label>
                                 <input type="file" name="documents[]" class="form-control"
                                     accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" multiple>
-                            </div>
+                            </div> -->
 
                             <div class="col-xl-3 col-lg-6 col-12 form-group mt-3">
                                 <label>Ecole provenance *</label>

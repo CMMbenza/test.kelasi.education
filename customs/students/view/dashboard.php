@@ -23,51 +23,80 @@ function file_exists_rel(string $relFromThisFile): bool {
 function web_path(string $rel): string { return $rel; }
 
 // --------- CONTEXTE SESSION ----------
-$code_ecole = $_SESSION['code_ecole'] ?? null;
-$studentId  = isset($_SESSION['student_id']) ? (int)$_SESSION['student_id'] : null;
-$classId    = isset($_SESSION['class_id'])   ? (int)$_SESSION['class_id']   : null;
-$studentName= $_SESSION['username'] ?? 'Élève';
-$email      = $_SESSION['email'] ?? null;
-$username   = $_SESSION['username'] ?? null;
+$code_ecole  = $_SESSION['code_ecole'] ?? null;
+$studentId   = isset($_SESSION['student_id']) ? (int)$_SESSION['student_id'] : null;
+$classId     = isset($_SESSION['class_id'])   ? (int)$_SESSION['class_id']   : null;
+$studentName = $_SESSION['username'] ?? 'Élève';
+$email       = $_SESSION['email'] ?? null;
+$username    = $_SESSION['username'] ?? null;
 
-// Récupérer l'élève si pas encore set
+// Détection de l'ID utilisateur (users.id) selon les différentes clés de session possibles
+$userId = $_SESSION['user_id'] 
+          ?? $_SESSION['id'] 
+          ?? $_SESSION['id_user'] 
+          ?? ($_SESSION['user']['id'] ?? null);
+
+// Récupérer l'élève et Mettre à jour id_user dans la table students
 try {
-    if (!$studentId) {
-        if ($email) {
-            $sql = "SELECT id, class_id, first_name, last_name FROM students WHERE email=:em";
-            if ($code_ecole) $sql .= " AND code_ecole=:ce";
-            $sql .= " LIMIT 1";
-            $st = $pdo->prepare($sql);
-            $p  = [':em'=>$email]; if ($code_ecole) $p[':ce']=$code_ecole;
-            $st->execute($p);
-            if ($r = $st->fetch(PDO::FETCH_ASSOC)) {
-                $studentId = (int)$r['id']; $_SESSION['student_id']=$studentId;
-                if (!$classId && !empty($r['class_id'])) { $classId = (int)$r['class_id']; $_SESSION['class_id']=$classId; }
-                $studentName = trim(($r['first_name']??'').' '.($r['last_name']??'')) ?: $studentName;
-            }
+    // 1. Si on n'a pas encore studentId, on le cherche d'abord par id_user
+    if (!$studentId && $userId) {
+        $st = $pdo->prepare("SELECT id, class_id, first_name, last_name FROM students WHERE id_user = :uid LIMIT 1");
+        $st->execute([':uid' => (int)$userId]);
+        if ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+            $studentId = (int)$r['id']; 
+            $_SESSION['student_id'] = $studentId;
+            if (!$classId && !empty($r['class_id'])) { $classId = (int)$r['class_id']; $_SESSION['class_id'] = $classId; }
+            $studentName = trim(($r['first_name']??'').' '.($r['last_name']??'')) ?: $studentName;
         }
-        if (!$studentId && $username) {
-            $sql = "SELECT id, class_id, first_name, last_name FROM students WHERE username=:un";
-            if ($code_ecole) $sql .= " AND code_ecole=:ce";
-            $sql .= " LIMIT 1";
-            $st = $pdo->prepare($sql);
-            $p  = [':un'=>$username]; if ($code_ecole) $p[':ce']=$code_ecole;
-            $st->execute($p);
-            if ($r = $st->fetch(PDO::FETCH_ASSOC)) {
-                $studentId = (int)$r['id']; $_SESSION['student_id']=$studentId;
-                if (!$classId && !empty($r['class_id'])) { $classId=(int)$r['class_id']; $_SESSION['class_id']=$classId; }
-                $studentName = trim(($r['first_name']??'').' '.($r['last_name']??'')) ?: $studentName;
-            }
+    }
+
+    // 2. Recherche par Email
+    if (!$studentId && $email) {
+        $sql = "SELECT id, class_id, first_name, last_name FROM students WHERE email=:em";
+        if ($code_ecole) $sql .= " AND code_ecole=:ce";
+        $sql .= " LIMIT 1";
+        $st = $pdo->prepare($sql);
+        $p  = [':em'=>$email]; if ($code_ecole) $p[':ce']=$code_ecole;
+        $st->execute($p);
+        if ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+            $studentId = (int)$r['id']; $_SESSION['student_id']=$studentId;
+            if (!$classId && !empty($r['class_id'])) { $classId = (int)$r['class_id']; $_SESSION['class_id']=$classId; }
+            $studentName = trim(($r['first_name']??'').' '.($r['last_name']??'')) ?: $studentName;
         }
-    } else {
-        if (!$classId) {
-            $st=$pdo->prepare("SELECT class_id, first_name, last_name FROM students WHERE id=:sid LIMIT 1");
-            $st->execute([':sid'=>$studentId]);
-            if ($r=$st->fetch(PDO::FETCH_ASSOC)) {
-                if (!$classId && !empty($r['class_id'])) { $classId=(int)$r['class_id']; $_SESSION['class_id']=$classId; }
-                $studentName = trim(($r['first_name']??'').' '.($r['last_name']??'')) ?: $studentName;
-            }
+    }
+
+    // 3. Recherche par Username
+    if (!$studentId && $username) {
+        $sql = "SELECT id, class_id, first_name, last_name FROM students WHERE username=:un";
+        if ($code_ecole) $sql .= " AND code_ecole=:ce";
+        $sql .= " LIMIT 1";
+        $st = $pdo->prepare($sql);
+        $p  = [':un'=>$username]; if ($code_ecole) $p[':ce']=$code_ecole;
+        $st->execute($p);
+        if ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+            $studentId = (int)$r['id']; $_SESSION['student_id']=$studentId;
+            if (!$classId && !empty($r['class_id'])) { $classId=(int)$r['class_id']; $_SESSION['class_id']=$classId; }
+            $studentName = trim(($r['first_name']??'').' '.($r['last_name']??'')) ?: $studentName;
         }
+    }
+
+    // 4. Si studentId est déjà connu mais pas la classe
+    if ($studentId && !$classId) {
+        $st=$pdo->prepare("SELECT class_id, first_name, last_name FROM students WHERE id=:sid LIMIT 1");
+        $st->execute([':sid'=>$studentId]);
+        if ($r=$st->fetch(PDO::FETCH_ASSOC)) {
+            if (!$classId && !empty($r['class_id'])) { $classId=(int)$r['class_id']; $_SESSION['class_id']=$classId; }
+            $studentName = trim(($r['first_name']??'').' '.($r['last_name']??'')) ?: $studentName;
+        }
+    }
+
+    // 5. MISE À JOUR SYSTÉMATIQUE DU CHAMP id_user DANS STUDENTS
+    if ($studentId && $userId) {
+        $stUpdate = $pdo->prepare("UPDATE students SET id_user = :uid WHERE id = :sid");
+        $stUpdate->execute([
+            ':uid' => (int)$userId,
+            ':sid' => (int)$studentId
+        ]);
     }
 } catch(Throwable $e){ /* silence */ }
 
@@ -260,7 +289,9 @@ if ($studentId && $classId) {
     $presenceDetails = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+require_once __DIR__ . '/../layout/check_payment.php';
 ?>
+
 <!doctype html>
 <html class="no-js" lang="fr">
 

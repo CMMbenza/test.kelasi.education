@@ -111,6 +111,45 @@ require_once 'service/user_connecter.php';
                 </a>
             </li>
 
+            <li class="d-none nav-item sidebar-nav-item">
+                <a href="javascript:void(0);" class="nav-link">
+                    <i class="icon-sidebar fas fa-cog"></i>
+                    <span>Paramètres</span>
+                </a>
+                <ul class="nav sub-group-menu">
+                    <li class="nav-item">
+                        <a href="setting-school.php" class="nav-link">
+                            <i class="fas fa-angle-right"></i> Profil Établissement
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="all-depenses.php" class="nav-link">
+                            <i class="fas fa-angle-right"></i> Dépenses
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="presence_student.php" class="nav-link">
+                            <i class="fas fa-angle-right"></i> Présence des élèves
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="add-horaires.php" class="nav-link">
+                            <i class="fas fa-angle-right"></i> Horaires de cours
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="reports.php" class="nav-link">
+                            <i class="fas fa-angle-right"></i> Rapports & Stats
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="controle.php" class="nav-link">
+                            <i class="fas fa-angle-right"></i> Contrôle FS
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            
             <li class="nav-item">
                 <a href="../login/logout.php?msg=logout" class="text-danger nav-link">
                     <i class="fas fa-sign-out-alt"></i>

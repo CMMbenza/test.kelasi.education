@@ -60,6 +60,42 @@ $students = $students->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../css/datepicker.min.css">
     <link rel="stylesheet" href="../style.css">
     <script src="../js/modernizr-3.6.0.min.js"></script>
+
+    <style>
+    /* Styles pour l'autocomplétion responsive mobile */
+    .autocomplete-container {
+        position: relative;
+    }
+
+    .autocomplete-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 1050;
+        max-height: 200px;
+        overflow-y: auto;
+        background-color: #fff;
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 0.25rem 0.25rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: none;
+    }
+
+    .autocomplete-suggestion {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f1f1;
+        font-size: 14px;
+    }
+
+    .autocomplete-suggestion:hover,
+    .autocomplete-suggestion.active {
+        background-color: #f8f9fa;
+        color: #007bff;
+    }
+    </style>
 </head>
 
 <body>
@@ -89,7 +125,7 @@ $students = $students->fetchAll(PDO::FETCH_ASSOC);
                         <form method="POST" action="service/save_paiement.php">
 
                             <div class="row">
-                                <div class="col-6">
+                                <div class="col-lg-6 col-sm-12">
                                     <!-- TYPE -->
                                     <div class="form-group">
                                         <label>Type de frais</label>
@@ -101,31 +137,28 @@ $students = $students->fetchAll(PDO::FETCH_ASSOC);
                                         </select>
                                     </div>
                                 </div>
-                                <div class="col-6">
-                                    <!-- ELEVE -->
-                                    <div class="form-group">
+                                <div class="col-lg-6 col-sm-12">
+                                    <!-- ELEVE (AUTOCOMPLETE MOBILE FRIENDLY) -->
+                                    <div class="form-group autocomplete-container">
                                         <label>Élève</label>
-                                        <select name="eleve" id="eleve" class="form-control" required>
-                                            <option value="#" selected disabled>-- élève --</option>
-                                            <?php foreach ($students as $s): ?>
-                                            <option value="<?= $s['id'] ?>">
-                                                <?= htmlspecialchars($s['label']) ?>
-                                            </option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                        <input type="text" id="eleve_input" class="form-control"
+                                            placeholder="Saisir le nom de l'élève..." autocomplete="off" required>
+                                        <input type="hidden" name="eleve" id="eleve">
+
+                                        <div id="custom_suggestions" class="autocomplete-suggestions"></div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="row">
-                                <div class="col-6">
+                                <div class="col-lg-6 col-sm-12">
                                     <!-- MONTANT TOTAL -->
                                     <div class="form-group">
                                         <label>Montant total $</label>
                                         <input type="number" id="montant_total" class="form-control" readonly>
                                     </div>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-lg-6 col-sm-12">
                                     <!-- TOTAL PAYE -->
                                     <div class="form-group">
                                         <label>Total déjà payé $</label>
@@ -135,14 +168,15 @@ $students = $students->fetchAll(PDO::FETCH_ASSOC);
                             </div>
 
                             <div class="row">
-                                <div class="col-6">
+                                <div class="col-lg-6 col-sm-12">
                                     <!-- SOLDE RESTANT -->
                                     <div class="form-group">
                                         <label>Solde restant $</label>
-                                        <input type="number" name="solde_restant" id="solde_restant" class="form-control" readonly>
+                                        <input type="number" name="solde_restant" id="solde_restant"
+                                            class="form-control" readonly>
                                     </div>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-lg-6 col-sm-12">
                                     <!-- MONTANT PAYE -->
                                     <div class="form-group">
                                         <label>Montant payé $</label>
@@ -185,13 +219,59 @@ $students = $students->fetchAll(PDO::FETCH_ASSOC);
     <script>
     let soldeRestant = 0;
 
+    // DONNÉES ÉLÈVES INJECTÉES DEPUIS PHP
+    const studentsData = <?= json_encode($students, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+
+    const eleveInput = document.getElementById('eleve_input');
+    const hiddenEleve = document.getElementById('eleve');
+    const suggestionsBox = document.getElementById('custom_suggestions');
+
+    // FILTRAGE ET AFFICHAGE DES SUGGESTIONS
+    eleveInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        suggestionsBox.innerHTML = '';
+        hiddenEleve.value = '';
+
+        if (query === '') {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+
+        const filtered = studentsData.filter(s => s.label.toLowerCase().includes(query));
+
+        if (filtered.length > 0) {
+            filtered.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-suggestion';
+                div.textContent = s.label;
+                div.addEventListener('click', function() {
+                    eleveInput.value = s.label;
+                    hiddenEleve.value = s.id;
+                    suggestionsBox.style.display = 'none';
+                    loadMontant();
+                });
+                suggestionsBox.appendChild(div);
+            });
+            suggestionsBox.style.display = 'block';
+        } else {
+            suggestionsBox.style.display = 'none';
+        }
+    });
+
+    // MASQUER LA LISTE AU CLIC EN DEHORS
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.autocomplete-container')) {
+            suggestionsBox.style.display = 'none';
+        }
+    });
+
     // CHARGEMENT DONNÉES
     function loadMontant() {
 
         let statut = document.getElementById('statut').value;
         let eleve = document.getElementById('eleve').value;
 
-        if (!statut || !eleve) return;
+        if (!statut || !eleve || eleve === '#') return;
 
         fetch(`service/get_montant.php?statut=${statut}&eleve=${eleve}`)
             .then(res => res.json())
@@ -221,6 +301,8 @@ $students = $students->fetchAll(PDO::FETCH_ASSOC);
 
     // EVENTS
     document.getElementById('statut').addEventListener('change', loadMontant);
-    document.getElementById('eleve').addEventListener('change', loadMontant);
     document.getElementById('montant_paye').addEventListener('input', calculSolde);
     </script>
+</body>
+
+</html>

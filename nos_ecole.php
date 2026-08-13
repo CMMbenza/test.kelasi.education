@@ -237,7 +237,7 @@ $ecoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php foreach ($ecoles as $ecole): ?>
             <div class="col-lg-4 col-md-6 ecole-card">
                 <div class="card card-ecole h-100 text-center p-4">
-                    <img src="<?php echo htmlspecialchars($ecole['logo'] ?: 'https://png.pngtree.com/png-clipart/20230623/original/pngtree-school-logo-design-template-vector-png-image_9204124.png'); ?>"
+                    <img src="uploads/logo/<?php echo htmlspecialchars($ecole['logo'] ?: 'img/kelasi.png'); ?>"
                         alt="<?php echo htmlspecialchars($ecole['nom_ecole']); ?>" class="mb-3 mx-auto">
                     <h4><?php echo htmlspecialchars($ecole['nom_ecole']); ?></h4>
                     <div class="ville-pays">

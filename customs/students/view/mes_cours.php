@@ -199,6 +199,7 @@ if(!$student){
     }
     unset($course);
 }
+require_once __DIR__ . '/../layout/check_payment.php';
 ?>
 <!doctype html>
 <html class="no-js" lang="fr">

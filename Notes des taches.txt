@@ -136,3 +136,6 @@ executer dans data :
 5. Correction pour le mouvement de paiement avec une precision de connaitre montant à payer, payé et reste
 6. Eleve peut lire les contenus d'une lecons 
 7. L'élève peut consulter sa précense
+
+ Get-ChildItem -File | Rename-Item -NewName {$_.name -replace ' ', '_'}
+ ALTER TABLE `students` ADD `id_user` INT NOT NULL AFTER `statut`;

@@ -142,7 +142,7 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
                     <div class="item-content">
                         <ul class="settings-list">
                             <li><a href="profil.php"><i class="flaticon-user"></i>Mon profil</a></li>
-                            <!--<li><a href="account-settings.php"><i class="flaticon-gear-loading"></i>Paramètres</a></li>-->
+                            <li><a href="settings.php"><i class="flaticon-gear-loading"></i>Paramètres</a></li>
                             <li><a href="../login/logout.php?msg=logout"><i
                                         class="flaticon-turn-off"></i>Déconnexion</a></li>
                         </ul>
@@ -159,3 +159,6 @@ $fullName = trim(($nomResp ?: '') . ' ' . ($postnomResp ?: ''));
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/js/all.min.js"
     integrity="sha512-6BTOlkauINO65nLhXhthZMtepgJSghyimIalb+crKRPhvhmsCdnIuGcVbR5/aQY2A+260iC1OPy1oCdB6pSSwQ=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous">
+</script>
