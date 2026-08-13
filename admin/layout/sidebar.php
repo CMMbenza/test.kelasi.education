@@ -104,14 +104,14 @@ require_once 'service/user_connecter.php';
                     <span>Mon profil</span>
                 </a>
             </li>
-            <!-- <li class="nav-item">
+            <li class="nav-item">
                 <a href="settings.php" class="nav-link">
                     <i class="icon-sidebar fas fa-cog"></i>
                     <span>Paramétres</span>
                 </a>
-            </li> -->
+            </li>
 
-            <li class="nav-item sidebar-nav-item">
+            <li class="d-none nav-item sidebar-nav-item">
                 <a href="javascript:void(0);" class="nav-link">
                     <i class="icon-sidebar fas fa-cog"></i>
                     <span>Paramètres</span>
