@@ -1,71 +1,53 @@
 <?php
+// email.php
 declare(strict_types=1);
 
-/**
- * CONFIG EMAIL
- */
+// Configurations globales d'expédition
 $MAIL_FROM      = 'no-reply@kelasi.education';
-$MAIL_FROM_NAME = 'Kelasi';
-$MAIL_REPLY_TO  = 'contact@kelasi.education';
+$MAIL_FROM_NAME = 'MyKelasi';
 
-/**
- * URL LOGIN (auto)
- */
 if (!function_exists('kelasi_login_url')) {
     function kelasi_login_url(): string {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        return $scheme.'://'.$host.'/mykelasi/login';
+        return 'https://kelasi.education/mykelasi/my_school/';
     }
 }
 
 /**
- * CORE MAIL SENDER (HTML)
+ * Moteur d'envoi générique utilisant exactement le même formatage d'en-têtes 
+ * et d'encodage de sujet que votre fichier fonctionnel.
  */
 if (!function_exists('mail_html')) {
     function mail_html(string $to, string $subject, string $html): bool {
+        global $MAIL_FROM, $MAIL_FROM_NAME;
 
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return false;
         }
 
-        $from     = $GLOBALS['MAIL_FROM'] ?? 'no-reply@kelasi.education';
-        $fromName = $GLOBALS['MAIL_FROM_NAME'] ?? 'Kelasi';
-        $replyTo  = $GLOBALS['MAIL_REPLY_TO'] ?? 'contact@kelasi.education';
-
-        $domain   = parse_url('http://' . ($_SERVER['HTTP_HOST'] ?? 'kelasi.education'), PHP_URL_HOST);
-        $msgId    = '<' . time() . '.' . bin2hex(random_bytes(4)) . '@' . $domain . '>';
+        $from     = $MAIL_FROM ?? 'no-reply@kelasi.education';
+        $fromName = $MAIL_FROM_NAME ?? 'MyKelasi';
 
         $headers  = "MIME-Version: 1.0\r\n";
         $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-        $headers .= "Content-Transfer-Encoding: 8bit\r\n";
-        $headers .= 'From: =?UTF-8?B?'.base64_encode($fromName)."?= <{$from}>\r\n";
-        $headers .= "Reply-To: {$replyTo}\r\n";
-        $headers .= "Date: " . date(DATE_RFC2822) . "\r\n";
-        $headers .= "Message-ID: {$msgId}\r\n";
-        $headers .= "X-Mailer: PHP/".phpversion()."\r\n";
+        $headers .= "From: " . $fromName . " <" . $from . ">\r\n";
 
-        return @mail(
-            $to,
-            '=?UTF-8?B?'.base64_encode($subject).'?=',
-            $html,
-            $headers,
-            "-f ".$from
-        );
+        // Encodage UTF-8/Base64 du sujet pour éviter le rejet par les serveurs
+        $subjectEncoded = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+
+        return @mail($to, $subjectEncoded, $html, $headers);
     }
 }
 
 /**
- * ✅ ENVOI IDENTIFIANTS ÉLÈVE (USER + PASSWORD)
- * (C'est celle que tu utilises dans inscription_eleve.php)
+ * Envoie les identifiants à l'élève inscrit
  */
 if (!function_exists('send_student_credentials')) {
     function send_student_credentials(string $to, array $data): bool {
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
 
-        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-
-        $subject = "Vos accès MyKelasi - Compte élève";
-
+        $subject = "Vos accès MyKelasi — Compte élève";
         $loginUrl = $data['login_url'] ?? kelasi_login_url();
 
         $first = htmlspecialchars($data['first'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -74,85 +56,76 @@ if (!function_exists('send_student_credentials')) {
         $pass  = htmlspecialchars($data['password'] ?? '', ENT_QUOTES, 'UTF-8');
         $ecole = htmlspecialchars($data['ecole_name'] ?? '', ENT_QUOTES, 'UTF-8');
 
-        $html = "
-        <div style='font-family:Arial,sans-serif;padding:15px;color:#333;line-height:1.5;'>
-            <h2>Bienvenue {$first} {$last}</h2>
-
-            <p>Votre compte élève a été créé sur <strong>{$ecole}</strong>.</p>
-
-            <p><strong>Identifiants de connexion :</strong></p>
-
-            <ul>
-                <li><b>Nom d'utilisateur :</b> {$user}</li>
-                <li><b>Mot de passe :</b> {$pass}</li>
-            </ul>
+        $html = '
+        <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#222;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px;">
+            <h2 style="color:#0d6efd;margin-top:0;">Bienvenue ' . $first . ' ' . $last . '</h2>
+            <p>Votre compte élève a été créé avec succès pour l\'établissement <strong>' . $ecole . '</strong>.</p>
+            
+            <div style="background-color:#f8f9fa;padding:15px;border-left:4px solid #0d6efd;margin:20px 0;">
+                <p style="margin:0 0 8px 0;"><strong>Identifiants de connexion :</strong></p>
+                <p style="margin:4px 0;"><strong>Nom d\'utilisateur :</strong> ' . $user . '</p>
+                <p style="margin:4px 0;"><strong>Mot de passe :</strong> ' . $pass . '</p>
+            </div>
 
             <p>
-                <a href='{$loginUrl}' style='display:inline-block;padding:10px 15px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:5px'>
-                    Se connecter
+                <a href="' . htmlspecialchars($loginUrl) . '" 
+                   style="display:inline-block;padding:12px 20px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">
+                   Accéder à mon espace
                 </a>
             </p>
-
-            <p style='color:#888;font-size:12px'>
-                Changez votre mot de passe après connexion.
-            </p>
-        </div>";
+            <p style="font-size:13px;color:#666;">Pour des raisons de sécurité, nous vous conseillons de changer ce mot de passe après votre première connexion.</p>
+            <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
+            <p style="font-size:12px;color:#888;">Ceci est un e-mail automatique sent par MyKelasi, merci de ne pas y répondre directement.</p>
+        </div>';
 
         return mail_html($to, $subject, $html);
     }
 }
 
 /**
- * ✅ NOTIFICATION ADMIN (corrigée)
+ * Notifie les administrateurs/promoteurs de l'école lors d'une nouvelle inscription
  */
 if (!function_exists('notify_admins_new_student')) {
     function notify_admins_new_student(PDO $pdo, string $code_ecole, array $data): int {
-
-        $subject = "Nouvelle inscription élève - ".($data['ecole_name'] ?? '');
+        $subject = "Notification : Nouvelle inscription élève (" . ($data['ecole_name'] ?? '') . ")";
 
         $first      = htmlspecialchars($data['first'] ?? '', ENT_QUOTES, 'UTF-8');
         $last       = htmlspecialchars($data['last'] ?? '', ENT_QUOTES, 'UTF-8');
         $email      = htmlspecialchars($data['email'] ?? '', ENT_QUOTES, 'UTF-8');
         $phone      = htmlspecialchars($data['phone'] ?? '', ENT_QUOTES, 'UTF-8');
-        $class_id   = htmlspecialchars((string)($data['class_id'] ?? ''), ENT_QUOTES, 'UTF-8');
         $ecole_name = htmlspecialchars($data['ecole_name'] ?? '', ENT_QUOTES, 'UTF-8');
 
-        $html = "
-        <div style='font-family:Arial,sans-serif;'>
-            <h3>Nouvelle inscription</h3>
-            <p>École : <b>{$ecole_name}</b></p>
-
+        $html = '
+        <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#222;padding:15px;">
+            <h3 style="color:#0d6efd;">Nouvelle inscription enregistrée</h3>
+            <p>Un nouvel élève a été ajouté à votre établissement <strong>' . $ecole_name . '</strong>.</p>
             <ul>
-                <li>Élève : {$first} {$last}</li>
-                <li>Email : {$email}</li>
-                <li>Téléphone : {$phone}</li>
-                <li>Classe ID : {$class_id}</li>
+                <li><strong>Nom complet :</strong> ' . $first . ' ' . $last . '</li>
+                <li><strong>Email :</strong> ' . ($email !== '' ? $email : '<i>Non renseigné</i>') . '</li>
+                <li><strong>Téléphone :</strong> ' . ($phone !== '' ? $phone : '<i>Non renseigné</i>') . '</li>
             </ul>
-        </div>";
+        </div>';
 
-        // récupérer admins
+        // Recherche des administrateurs et promoteurs de cette école
         $stmt = $pdo->prepare("
-            SELECT email
-            FROM users
-            WHERE code_ecole = :ec
-            AND role IN ('admin','administrateur','promoteur')
+            SELECT email 
+            FROM users 
+            WHERE code_ecole = :code_ecole 
+            AND role IN ('admin', 'administrateur', 'promoteur')
         ");
-
-        $stmt->execute([':ec' => $code_ecole]);
+        $stmt->execute([':code_ecole' => $code_ecole]);
         $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $count = 0;
-
-        foreach ($admins as $a) {
-            $emailAdmin = trim($a['email'] ?? '');
-
-            if ($emailAdmin && filter_var($emailAdmin, FILTER_VALIDATE_EMAIL)) {
-                if (mail_html($emailAdmin, $subject, $html)) {
-                    $count++;
+        $sentCount = 0;
+        foreach ($admins as $admin) {
+            $adminEmail = trim($admin['email'] ?? '');
+            if ($adminEmail !== '' && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+                if (mail_html($adminEmail, $subject, $html)) {
+                    $sentCount++;
                 }
             }
         }
 
-        return $count;
+        return $sentCount;
     }
 }

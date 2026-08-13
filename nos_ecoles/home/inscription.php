@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/paserelle_url.php';             // init session + $url_session_ecole
 require __DIR__ . '/../../database/db_connect.php'; // $pdo
-require __DIR__ . '/email.php';                      // fonctions d'email
+require_once 'email.php';              // fonctions d'email
 
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 if (!($pdo instanceof PDO)) { http_response_code(500); exit('DB indisponible'); }
@@ -256,40 +256,61 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $pdo->commit();
 
         // ───────── Emails (après commit) ─────────
-        $loginUrl = kelasi_login_url();
+        // ───────── Traitement des e-mails (post-enregistrement) ─────────
+$loginUrl = kelasi_login_url();
+$mailSent = false;
 
-        if ($email !== '') {
-            @send_student_credentials($email, [
-                'first'=>$first_name, 'last'=>$last_name,
-                'username'=>$username, 'password'=>$plainPassword,
-                'code_ecole'=>$code_ecole, 'ecole_name'=>$nom_ecole,
-                'login_url'=>$loginUrl
-            ]);
-        }
-
-        @notify_admins_new_student($pdo, $code_ecole, [
-            'first'=>$first_name, 'last'=>$last_name,
-            'email'=>$email, 'phone'=>$phone,
-            'father'=>$father, 'mother'=>$mother,
-            'email_resp'=>$email_resp, 'phone_resp'=>$phone_resp,
-            'class_id'=>$class_id,
-            'username'=>$username, 'password'=>$plainPassword,
-            'ecole_name'=>$nom_ecole, 'code_ecole'=>$code_ecole
-        ]);
-
-        $ok = true;
-        $alert = '<div class="alert alert-success">✅ Inscription enregistrée. Identifiant: <b>'.e($username).'</b> — Mot de passe: <b>'.e($plainPassword).'</b>'
-               . ($email!=='' ? ' — un e-mail a été envoyé à l’élève.' : ' — aucun e-mail élève (adresse manquante).')
-               . ' Les administrateurs ont été notifiés.</div>';
-
-        $_POST = []; // reset form
-
-    } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        $alert = '<div class="alert alert-danger">❌ '.$e->getMessage().'</div>';
-    }
+// 1. Envoi des identifiants à l'élève (si un email est renseigné)
+if ($email !== '') {
+    $mailSent = send_student_credentials($email, [
+        'first'      => $first_name, 
+        'last'       => $last_name,
+        'username'   => $username, 
+        'password'   => $plainPassword,
+        'code_ecole' => $code_ecole, 
+        'ecole_name' => $nom_ecole,
+        'login_url'  => $loginUrl
+    ]);
 }
 
+// 2. Notification aux administrateurs / promoteurs de l'école
+$adminsNotified = notify_admins_new_student($pdo, $code_ecole, [
+    'first'      => $first_name, 
+    'last'       => $last_name,
+    'email'      => $email, 
+    'phone'      => $phone,
+    'father'     => $father, 
+    'mother'     => $mother,
+    'email_resp' => $email_resp, 
+    'phone_resp' => $phone_resp,
+    'class_id'   => $class_id,
+    'username'   => $username, 
+    'password'   => $plainPassword,
+    'ecole_name' => $nom_ecole, 
+    'code_ecole' => $code_ecole
+]);
+
+// 3. Message de confirmation
+$ok = true;
+$mailStatusText = $mailSent 
+    ? '📧 E-mail d’accès envoyé à l’élève.' 
+    : ($email !== '' ? '⚠️ Impossible d’envoyer l’e-mail à l’élève.' : 'ℹ️ Aucun e-mail renseigné pour l’élève.');
+
+$alert = '<div class="alert alert-success">'
+       . '✅ Inscription réussie !<br>'
+       . 'Identifiant : <b>' . e($username) . '</b> — Mot de passe : <b>' . e($plainPassword) . '</b><br>'
+       . $mailStatusText . '<br>'
+       . '📢 Admin(s) notifié(s) : ' . $adminsNotified
+       . '</div>';
+
+$_POST = []; // Réinitialisation du formulaire
+
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    $alert = '<div class="alert alert-danger">❌ ' . e($e->getMessage()) . '</div>';
+}
 // ───────────── Classes (pour le sélecteur) ─────────────
 $classes = [];
 try {

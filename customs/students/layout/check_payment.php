@@ -23,7 +23,7 @@ if ($userId && isset($pdo)) {
                 SELECT COUNT(*) 
                 FROM paiement 
                 WHERE eleve = ? 
-                  AND montant_paye > 0
+                  AND montant_paye > 0 AND is_validated = 1
             ");
             $stmtPayment->execute([$studentId]);
             $hasPaid = ($stmtPayment->fetchColumn() > 0);
